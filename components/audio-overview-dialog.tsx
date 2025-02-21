@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress'; 
+import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { AudioPlayer } from '@/components/audio-player';
 import { Mic, Loader2, AudioWaveform, Plus, PlayCircle } from 'lucide-react';
 import { autoContentApi } from '@/lib/api';
 import { VoiceCloneDialog } from '@/components/voice-clone-dialog';
-
+import { DialogFooter } from './ui/dialog-wrapper';
+import saveAs from 'save-as';
+import Link from 'next/link';
 interface Voice {
   id: string;
   name: string;
@@ -28,19 +30,21 @@ interface AudioOverviewDialogProps {
     voice2: string;
   }) => Promise<void>;
   audioUrl?: string;
+  progress?: number;
+
 }
 
 export function AudioOverviewDialog({
   isOpen,
   onClose,
   onGenerate,
-  audioUrl
+  audioUrl,
+  progress
 }: AudioOverviewDialogProps) {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [voice1, setVoice1] = useState('');
   const [voice2, setVoice2] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [showVoiceCloneDialog, setShowVoiceCloneDialog] = useState(false);
   const [options, setOptions] = useState({
     format: 'conversational',
@@ -97,14 +101,14 @@ export function AudioOverviewDialog({
       try {
         // Load available voices
         const availableVoices = await autoContentApi.getAvailableVoices();
-        
+
         setVoices(availableVoices);
-        
+
         if (availableVoices.length >= 2) {
           // Try to find a female and male voice pair for natural conversation
           const femaleVoices = availableVoices.filter(v => v.gender === 'f');
           const maleVoices = availableVoices.filter(v => v.gender === 'm');
-          
+
           if (femaleVoices.length > 0 && maleVoices.length > 0) {
             // Set default voice pair
             setVoice1(femaleVoices[0].id);
@@ -129,29 +133,29 @@ export function AudioOverviewDialog({
     loadVoices();
   }, [toast]);
 
-  // Progress simulation
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isGenerating) {
-      setProgress(0);
-      interval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 95) {
-            clearInterval(interval);
-            return 95;
-          }
-          return prev + 5;
-        });
-      }, 1000);
-    } else {
-      setProgress(0);
-    }
-    return () => clearInterval(interval);
-  }, [isGenerating]);
+  // // Progress simulation
+  // useEffect(() => {
+  //   let interval: NodeJS.Timeout;
+  //   if (isGenerating) {
+  //     setProgress(0);
+  //     interval = setInterval(() => {
+  //       setProgress(prev => {
+  //         if (prev >= 95) {
+  //           clearInterval(interval);
+  //           return 95;
+  //         }
+  //         return prev + 5;
+  //       });
+  //     }, 1000);
+  //   } else {
+  //     setProgress(0);
+  //   }
+  //   return () => clearInterval(interval);
+  // }, [isGenerating]);
 
   const handleVoiceCreated = (clonedVoice: Voice) => {
-      setVoices(prev => [...prev, clonedVoice]);
-      setShowVoiceCloneDialog(false);
+    setVoices(prev => [...prev, clonedVoice]);
+    setShowVoiceCloneDialog(false);
   };
 
   const handleGenerate = async () => {
@@ -204,17 +208,17 @@ export function AudioOverviewDialog({
         <PlayCircle className="h-4 w-4" />
       </Button>
     ) : null;
-    
+
     return (
-      <SelectItem 
-        key={voice.id} 
+      <SelectItem
+        key={voice.id}
         value={voice.id}
         disabled={isDisabled}
         className="flex items-center gap-2 text-sm"
       >
         <div className="flex items-center justify-between w-full">
           <span>
-            {voice.name} 
+            {voice.name}
             {voice.isCloned ? ' (Cloned)' : ` (${voice.gender === 'f' ? 'Female' : 'Male'}${accentLabel})`}
           </span>
           {previewButton}
@@ -222,20 +226,27 @@ export function AudioOverviewDialog({
       </SelectItem>
     );
   };
-
+ 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-[#1A1B1E]/95 to-[#2B2D31]/95 backdrop-blur-lg border-[#3B3D41] shadow-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-white">
             <Mic className="w-5 h-5" />
-            Audio Overview
+            Audio Overview1
           </DialogTitle>
         </DialogHeader>
-        
         <div className="grid gap-4 py-4">
           {audioUrl ? (
-            <AudioPlayer audioUrl={audioUrl} />
+            <>
+              <AudioPlayer audioUrl={audioUrl} />
+              <div className="flex justify-end mt-4">
+                <a href={audioUrl} download="audio_overview.mp3">
+                  Download
+                </a>
+              </div>
+
+            </>
           ) : isGenerating ? (
             <div className="space-y-6 py-8">
               <div className="flex flex-col items-center justify-center gap-4">
@@ -243,8 +254,8 @@ export function AudioOverviewDialog({
                   <div className="absolute inset-0 flex items-center justify-center">
                     <AudioWaveform className="w-8 h-8 text-blue-500 animate-pulse" />
                   </div>
-                  <div className="absolute inset-0 border-4 border-t-blue-500 rounded-full animate-spin" 
-                       style={{ borderTopColor: 'rgb(59, 130, 246)', animationDuration: '1.5s' }} />
+                  <div className="absolute inset-0 border-4 border-t-blue-500 rounded-full animate-spin"
+                    style={{ borderTopColor: 'rgb(59, 130, 246)', animationDuration: '1.5s' }} />
                 </div>
                 <div className="text-center">
                   <h3 className="text-lg font-medium mb-2">Generating Audio Overview</h3>
@@ -302,7 +313,7 @@ export function AudioOverviewDialog({
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={handleGenerate}
                   disabled={isGenerating || voices.length === 0 || !voice1 || !voice2}
                   className="bg-[#4285f4] hover:bg-[#3b77db]"
@@ -321,6 +332,7 @@ export function AudioOverviewDialog({
           )}
         </div>
       </DialogContent>
+
     </Dialog>
   );
 }

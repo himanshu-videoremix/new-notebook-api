@@ -37,7 +37,7 @@ import { useApiFeatures } from '@/hooks/use-api-features';
 
 export function NotebookInterface() {
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showAudioDialog, setShowAudioDialog] = useState(false);
+  const [showAudioDialog, setShowAudioDialog] = useState(true);
   const [showDeepDiveDialog, setShowDeepDiveDialog] = useState(false);
   const [showBriefingDialog, setShowBriefingDialog] = useState(false);
   const [showStudyGuideDialog, setShowStudyGuideDialog] = useState(false);
@@ -249,6 +249,7 @@ export function NotebookInterface() {
       if (result.finalResult?.audio_url) {
         setAudioUrl(result.finalResult.audio_url);
         setShowAudioDialog(true);
+        setProgress(result?.finalResult.status)
       } else {
         console.error("Audio URL is missing. Full response:", result);
         throw new Error("No audio URL returned");
@@ -694,6 +695,7 @@ export function NotebookInterface() {
           onClose={() => setShowAudioDialog(false)}
           onGenerate={handleGenerateAudio}
           audioUrl={audioUrl}
+          progress={progress}
         />
 
         <DeepDiveDialog
