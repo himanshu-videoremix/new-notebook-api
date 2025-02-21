@@ -1,0 +1,826 @@
+import { ModifyPodcastRequest, ModifyPodcastResponse, ProcessResponse } from "./types";
+
+// API Configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_KEY = "dfe22057-4937-464d-8d75-9c04f081acd4";
+
+// API Endpoints
+const ENDPOINTS = {
+  create: "/Content/Create",
+  status: "/Content/Status",
+  getVoices: "/Content/GetVoices",
+  cloneVoice: "/Content/CloneVoice",
+  usage: "/Content/Usage",
+  list: "/Content/List",
+  webhook: "/Content/Webhook",
+  studio: {
+    analyze: "/Studio/Analyze",
+    generate: "/Studio/Generate",
+    compare: "/Studio/Compare",
+    export: "/Studio/Export",
+    tools: {
+      summarize: "/Studio/Tools/Summarize",
+      highlight: "/Studio/Tools/Highlight",
+      annotate: "/Studio/Tools/Annotate",
+      search: "/Studio/Tools/Search",
+    },
+  },
+} as const;
+
+interface Voice {
+  id: string;
+  name: string;
+  language: string;
+  gender?: string;
+  isCloned?: boolean;
+  sourceAudio?: string;
+}
+
+interface GenerationOptions {
+  format?: string;
+  tone?: string;
+  length?: string;
+  voice1?: string;
+  voice2?: string;
+  speakers?: {
+    host1: string;
+    host2: string;
+  };
+  includeCitations?: boolean;
+}
+
+interface VoiceCloneOptions {
+  name: string;
+  audioFile: File;
+  gender?: "male" | "female";
+  language?: string;
+}
+
+// Mock response generator for offline mode
+function mockResponse(request: any): any {
+  const requestId = `mock_${Date.now()}`;
+
+  // Store mock request for status polling
+  if (typeof window !== "undefined") {
+    localStorage.setItem(
+      requestId,
+      JSON.stringify({
+        status: "completed",
+        content: `Mock ${request.outputType} response for offline mode`,
+      })
+    );
+  }
+
+  return {
+    request_id: requestId,
+  };
+}
+
+export const autoContentApi = {
+  async createDeepDiveContent(
+    resources: string[],
+    text: string,
+    options: {
+      outputType?: "text" | "audio";
+      includeCitations?: boolean;
+      customization?: any;
+    } = {}
+  ) {
+    try {
+      const url = `/api/content`;
+      const headers = {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
+
+      const payload = {
+        resources: resources.map((r) => ({
+          content: r,
+          type:  "website",
+        })),
+        text,
+        includeCitations: options.includeCitations ?? false,
+        outputType: "deep_dive",
+        outputFormat: options.outputType || "text",
+        customization: options.customization,
+      };
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      }).catch((error) => {
+        console.error("Network error:", error);
+        throw new Error(`Network error: ${error.message}`);
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("API error response:", errorData);
+        throw new Error(`AutoContent API error: ${errorData}`);
+      }
+
+      const data = await response.json();
+
+      // Handle request_id for polling if needed
+      if (data.request_id) {
+        const result = await this.pollStatus(data.request_id);
+        if (result.status === "completed") {
+          return {
+            content: result.content,
+            request_id: data.request_id,
+            audio_url: result.audio_url,
+            metadata: result.metadata,
+          };
+        }
+        throw new Error("Content generation failed or timed out");
+      }
+      console.log("Content generation",data);
+      return data;
+    } catch (error) {
+      console.error("Deep dive generation error:", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString(),
+        resourceCount: resources.length,
+      });
+      throw error;
+    }
+  },
+
+  async modifyPodcast(
+    request: ModifyPodcastRequest
+  ): Promise<ModifyPodcastResponse> {
+    try {
+      const response = await fetch(`${API_URL}/content/ModifyPodcast`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Failed to modify podcast: ${errorData}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error("Podcast modification error:", error);
+      throw error;
+    }
+  },
+
+  async cloneVoice(audioFile: File, name: string): Promise<Voice> {
+    try {
+      if (!API_KEY) {
+        throw new Error("API key is missing");
+      }
+
+      // Validate file size (max 10MB)
+      if (audioFile.size > 10 * 1024 * 1024) {
+        throw new Error("Audio file must be under 10MB");
+      }
+
+      // Validate file type
+      if (!audioFile.type.startsWith("audio/")) {
+        throw new Error("Invalid file type. Must be an audio file.");
+      }
+
+      const formData = new FormData();
+      formData.append("audio", audioFile);
+      formData.append("name", name);
+
+      const response = await fetch(`${API_URL}/content/CloneVoice`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Voice cloning failed: ${errorData}`);
+      }
+
+      const result = await response.json();
+
+      // Poll for completion if needed
+      if (result.request_id) {
+        const cloneStatus = await this.pollStatus(result.request_id);
+        if (cloneStatus.status === "failed") {
+          throw new Error(cloneStatus.error || "Voice cloning failed");
+        }
+      }
+
+      // Return formatted voice object
+      return {
+        id: result.voice_id || result.voiceId,
+        name: result.name,
+        language: "en-US",
+        isCloned: true,
+        sourceAudio: result.source_audio || result.sourceAudio,
+        preview_url: result.preview_url || result.previewUrl,
+        gender: result.gender || "unknown",
+        accent: result.accent || "neutral",
+        settings: {
+          speed_range: { min: 0.8, max: 1.2 },
+          pitch_range: { min: 0.8, max: 1.2 },
+          emphasis_levels: ["light", "moderate", "strong"],
+          emotion_intensities: ["low", "medium", "high"],
+        },
+      };
+    } catch (error) {
+      console.error("Voice cloning error:", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        fileName: audioFile.name,
+        fileSize: audioFile.size,
+        fileType: audioFile.type,
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
+    }
+  },
+
+  async getAvailableVoices(): Promise<Voice[]> {
+    try {
+      console.log("getAvailableVoices() - Start");
+
+      if (!API_KEY) {
+        console.warn("API key missing - using default voices");
+        return this.getDefaultVoices();
+      }
+
+      // Retry configuration
+      const maxRetries = 3;
+      const retryDelay = 1000;
+      let attempt = 0;
+
+      try {
+        // Retry loop
+        while (attempt < maxRetries) {
+          console.log(`Attempt ${attempt + 1} to fetch voices`);
+
+          // Add exponential backoff delay after first attempt
+          if (attempt > 0) {
+            const delay = retryDelay * Math.pow(2, attempt - 1);
+            console.log(`Retry delay: ${delay}ms`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+
+          try {
+            // Check network connectivity
+            if (typeof window !== "undefined" && !window.navigator.onLine) {
+              console.warn("No internet connection, using default voices");
+              return this.getDefaultVoices();
+            }
+
+            console.log("Fetching voices from API...");
+
+            const response = await fetch('/api/voices', {
+              signal: AbortSignal.timeout(10000)
+          });
+
+            console.log(`Response Status: ${response.status}`);
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.warn(
+                `Voice API error: ${response.status} - ${errorText}`
+              );
+              return this.getDefaultVoices();
+            }
+
+            const voices = await response.json();
+            console.log("API Response Data:", voices);
+
+            // Handle both array and { data: [] } response formats
+            const voiceData = Array.isArray(voices) ? voices : voices?.data;
+
+            if (!Array.isArray(voiceData)) {
+              throw new Error("Invalid voice data format");
+            }
+
+            console.log(`Total voices received: ${voiceData.length}`);
+
+            // Filter to only English voices and format them
+            const englishVoices = voiceData
+            .map((voice) => ({
+              id: voice.id.toString(),
+              name: voice.name,
+              language: 'en-US', // Since these are English voices
+              gender: voice.gender === 'f' ? 'female' : 'male',
+              isCloned: false, // Default value if not provided
+              accent: 'neutral', // Default value if not provided
+              preview_url: voice.sampleUrl || null,
+              style: 'neutral', // Default value if not provided
+              age: 'adult', // Default value if not provided
+              emotion: 'neutral', // Default value if not provided
+              speed_range: { min: 0.8, max: 1.2 }, // Default value if not provided
+              pitch_range: { min: 0.8, max: 1.2 }, // Default value if not provided
+              emphasis_levels: ['light', 'moderate', 'strong'], // Default value if not provided
+              emotion_intensities: ['low', 'medium', 'high'] // Default value if not provided
+            }))
+            .filter(voice => voice.name && voice.id); // Basic validation
+          
+          console.log(`Filtered voices: ${englishVoices.length}`);
+          
+          if (englishVoices.length === 0) {
+              throw new Error("No valid voices found");
+          }
+
+            console.log("Returning valid English voices");
+            return englishVoices;
+          } catch (error) {
+            console.error("Error fetching voices:", error);
+
+            const isNetworkError =
+              error instanceof Error &&
+              (error.name === "TypeError" ||
+                error.name === "AbortError" ||
+                error.message.includes("Failed to fetch") ||
+                error.message.includes("Network request failed") ||
+                error.message.includes("No internet connection"));
+
+            // Only retry on network errors
+            if (!isNetworkError) {
+              throw error; // Don't retry non-network errors
+            }
+
+            attempt++;
+
+            if (attempt >= maxRetries || !window.navigator.onLine) {
+              throw new Error(`Voice API failed after ${maxRetries} attempts`);
+            }
+
+            // Wait before retrying
+            console.log("Retrying API call...");
+            await new Promise((resolve) =>
+              setTimeout(resolve, retryDelay * Math.pow(2, attempt))
+            );
+          }
+        }
+
+        throw new Error("Failed to fetch voices");
+      } catch (error) {
+        // If all retries failed, fall back to default voices
+        console.warn("Falling back to default voices due to error:", error);
+        return this.getDefaultVoices();
+      }
+    } catch (error) {
+      console.error("Voice initialization error:", error);
+      return this.getDefaultVoices();
+    } finally {
+      console.log("getAvailableVoices() - End");
+    }
+  },
+
+  getDefaultVoices(): Voice[] {
+    const defaultVoices = [
+      // American English
+      {
+        id: "en_us_001",
+        name: "Matthew",
+        language: "en-US",
+        gender: "m",
+        accent: "american",
+      },
+      {
+        id: "en_us_002",
+        name: "Joanna",
+        language: "en-US",
+        gender: "f",
+        accent: "american",
+      },
+      {
+        id: "en_us_003",
+        name: "Ivy",
+        language: "en-US",
+        gender: "f",
+        accent: "american",
+      },
+      {
+        id: "en_us_004",
+        name: "Justin",
+        language: "en-US",
+        gender: "m",
+        accent: "american",
+      },
+      // British English
+      {
+        id: "en_uk_001",
+        name: "Emma",
+        language: "en-GB",
+        gender: "f",
+        accent: "british",
+      },
+      {
+        id: "en_uk_002",
+        name: "Brian",
+        language: "en-GB",
+        gender: "m",
+        accent: "british",
+      },
+      // Australian English
+      {
+        id: "en_au_001",
+        name: "Nicole",
+        language: "en-AU",
+        gender: "f",
+        accent: "australian",
+      },
+      {
+        id: "en_au_002",
+        name: "Russell",
+        language: "en-AU",
+        gender: "m",
+        accent: "australian",
+      },
+    ].map((voice) => ({
+      ...voice,
+      preview_url: null, // Default voices don't have preview URLs
+    }));
+    return defaultVoices;
+  },
+
+  async pollStatus(requestId: string, maxAttempts = 30, interval = 2000) {
+    let attempts = 0;
+
+    if (!API_KEY) {
+      throw new Error("API key is missing. Please check your .env.local file.");
+    }
+
+    while (attempts < maxAttempts) {
+      const response = await fetch(`${API_URL}/Content/Status/${requestId}`, {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to check status: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.status === "completed" || result.status === "failed") {
+        return result;
+      }
+
+      attempts++;
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+
+    throw new Error("Operation timed out");
+  },
+
+  // async getAvailableVoices(): Promise<Voice[]> {
+  //   try {
+  //     if (!API_KEY) {
+  //       console.warn('API key missing - using default voices');
+  //       return this.getDefaultVoices();
+  //     }
+
+  //     // Retry configuration
+  //     const maxRetries = 3;
+  //     const retryDelay = 1000;
+  //     let attempt = 0;
+  //     let lastError: Error | null = null;
+
+  //     try {
+  //       // Retry loop
+  //       while (attempt < maxRetries) {
+  //         // Add exponential backoff delay after first attempt
+  //         if (attempt > 0) {
+  //           await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt - 1)));
+  //         }
+
+  //         try {
+  //           // Check network connectivity
+  //           if (typeof window !== 'undefined' && !window.navigator.onLine) {
+  //             console.warn('No internet connection, using default voices');
+  //             return this.getDefaultVoices();
+  //           }
+
+  //           const response = await fetch(`${API_URL}${ENDPOINTS.getVoices}`, {
+  //             headers: {
+  //               'Authorization': `Bearer ${API_KEY}`,
+  //               'Content-Type': 'application/json',
+  //               'Accept': 'application/json',
+  //               'User-Agent': 'SmartNotebook/1.0'
+  //             },
+  //             signal: AbortSignal.timeout(10000) // Increase timeout to 10s
+  //           });
+
+  //           if (!response.ok) {
+  //             const errorText = await response.text();
+  //             console.warn(`Voice API error: ${response.status} - ${errorText}`);
+  //             return this.getDefaultVoices();
+  //           }
+
+  //           const voices = await response.json();
+
+  //           // Handle both array and { data: [] } response formats
+  //           const voiceData = Array.isArray(voices) ? voices : voices?.data;
+
+  //           if (!Array.isArray(voiceData)) {
+  //             throw new Error('Invalid voice data format');
+  //           }
+
+  //           // Filter to only English voices and format them
+  //           const englishVoices = voiceData
+  //             .filter(voice => {
+  //               return voice.name &&
+  //                      voice.id &&
+  //                      voice.language?.startsWith('en') &&
+  //                      (!voice.status || voice.status === 'active');
+  //             })
+  //             .map(voice => ({
+  //               id: voice.id.toString(),
+  //               name: voice.name,
+  //               language: voice.language || 'en-US',
+  //               gender: voice.gender || 'unknown',
+  //               isCloned: Boolean(voice.is_cloned || voice.isCloned),
+  //               accent: voice.accent || 'neutral',
+  //               preview_url: voice.preview_url || null,
+  //               style: voice.style || 'neutral',
+  //               age: voice.age || 'adult',
+  //               emotion: voice.emotion || 'neutral',
+  //               speed_range: voice.speed_range || { min: 0.8, max: 1.2 },
+  //               pitch_range: voice.pitch_range || { min: 0.8, max: 1.2 },
+  //               emphasis_levels: voice.emphasis_levels || ['light', 'moderate', 'strong'],
+  //               emotion_intensities: voice.emotion_intensities || ['low', 'medium', 'high']
+  //             }));
+
+  //           if (englishVoices.length === 0) {
+  //             throw new Error('No valid voices found');
+  //           }
+
+  //           return englishVoices;
+  //         } catch (error) {
+  //           const isNetworkError = error instanceof Error && (
+  //             error.name === 'TypeError' ||
+  //             error.name === 'AbortError' ||
+  //             error.message.includes('Failed to fetch') ||
+  //             error.message.includes('Network request failed') ||
+  //             error.message.includes('No internet connection')
+  //           );
+
+  //           // Only retry on network errors
+  //           if (!isNetworkError) {
+  //             throw error; // Don't retry non-network errors
+  //           }
+
+  //           attempt++;
+
+  //           if (attempt >= maxRetries || !window.navigator.onLine) {
+  //             throw new Error(`Voice API failed after ${maxRetries} attempts`);
+  //           }
+
+  //           // Wait before retrying
+  //           await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+  //         }
+  //       }
+
+  //       throw new Error('Failed to fetch voices');
+  //     } catch (error) {
+  //       // If all retries failed, fall back to default voices
+  //       console.warn('Falling back to default voices:', error);
+  //       return this.getDefaultVoices();
+  //     }
+  //   } catch (error) {
+  //     console.error('Voice initialization error:', error);
+  //     return this.getDefaultVoices();
+  //   }
+  // },
+
+  // getDefaultVoices(): Voice[] {
+  //   const defaultVoices = [
+  //     // American English
+  //     { id: 'en_us_001', name: 'Matthew', language: 'en-US', gender: 'm', accent: 'american' },
+  //     { id: 'en_us_002', name: 'Joanna', language: 'en-US', gender: 'f', accent: 'american' },
+  //     { id: 'en_us_003', name: 'Ivy', language: 'en-US', gender: 'f', accent: 'american' },
+  //     { id: 'en_us_004', name: 'Justin', language: 'en-US', gender: 'm', accent: 'american' },
+  //     { id: 'en_us_005', name: 'Kendra', language: 'en-US', gender: 'f', accent: 'american' },
+  //     { id: 'en_us_006', name: 'Kevin', language: 'en-US', gender: 'm', accent: 'american' },
+  //     // British English
+  //     { id: 'en_uk_001', name: 'Emma', language: 'en-GB', gender: 'f', accent: 'british' },
+  //     { id: 'en_uk_002', name: 'Brian', language: 'en-GB', gender: 'm', accent: 'british' },
+  //     { id: 'en_uk_003', name: 'Amy', language: 'en-GB', gender: 'f', accent: 'british' },
+  //     // Australian English
+  //     { id: 'en_au_001', name: 'Nicole', language: 'en-AU', gender: 'f', accent: 'australian' },
+  //     { id: 'en_au_002', name: 'Russell', language: 'en-AU', gender: 'm', accent: 'australian' },
+  //     // Indian English
+  //     { id: 'en_in_001', name: 'Aditi', language: 'en-IN', gender: 'f', accent: 'indian' },
+  //     { id: 'en_in_002', name: 'Raveena', language: 'en-IN', gender: 'f', accent: 'indian' }
+  //   ].map(voice => ({
+  //     ...voice,
+  //     preview_url: `${API_URL}/Content/VoicePreview/${voice.id}` // Add preview URL for default voices
+  //   }));
+  //   return defaultVoices;
+  // },
+
+  // async cloneVoice(audioFile: File, name: string): Promise<Voice> {
+  //   try {
+  //     if (!API_KEY) {
+  //       throw new Error('API key is missing');
+  //     }
+
+  //     // Validate file size (max 10MB)
+  //     if (audioFile.size > 10 * 1024 * 1024) {
+  //       throw new Error('Audio file must be under 10MB');
+  //     }
+
+  //     // Validate file type
+  //     if (!audioFile.type.startsWith('audio/')) {
+  //       throw new Error('Invalid file type. Must be an audio file.');
+  //     }
+
+  //     const formData = new FormData();
+  //     formData.append('audio', audioFile);
+  //     formData.append('name', name);
+
+  //     const response = await fetch(`${API_URL}${ENDPOINTS.cloneVoice}`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Authorization': `Bearer ${API_KEY}`,
+  //         'Accept': 'application/json',
+  //         'User-Agent': 'SmartNotebook/1.0'
+  //       },
+  //       body: formData
+  //     });
+
+  //     if (!response.ok) {
+  //       const errorData = await response.text();
+  //       throw new Error(`Voice cloning failed: ${errorData}`);
+  //     }
+
+  //     const result = await response.json();
+
+  //     // Poll for completion if needed
+  //     if (result.request_id) {
+  //       const cloneStatus = await this.pollStatus(result.request_id);
+  //       if (cloneStatus.status === 'failed') {
+  //         throw new Error(cloneStatus.error || 'Voice cloning failed');
+  //       }
+  //     }
+
+  //     // Return formatted voice object
+  //     return {
+  //       id: result.voice_id || result.voiceId,
+  //       name: result.name,
+  //       language: 'en-US',
+  //       isCloned: true,
+  //       sourceAudio: result.source_audio || result.sourceAudio,
+  //       preview_url: result.preview_url || result.previewUrl,
+  //       gender: result.gender || 'unknown',
+  //       accent: result.accent || 'neutral',
+  //       settings: {
+  //         speed_range: { min: 0.8, max: 1.2 },
+  //         pitch_range: { min: 0.8, max: 1.2 },
+  //         emphasis_levels: ['light', 'moderate', 'strong'],
+  //         emotion_intensities: ['low', 'medium', 'high']
+  //       }
+  //     };
+  //   } catch (error) {
+  //     console.error('Voice cloning error:', {
+  //       error: error instanceof Error ? error.message : 'Unknown error',
+  //       fileName: audioFile.name,
+  //       fileSize: audioFile.size,
+  //       fileType: audioFile.type,
+  //       timestamp: new Date().toISOString()
+  //     });
+  //     throw error;
+  //   }
+  // },
+
+  async uploadSource(file: File): Promise<ProcessResponse> {
+    try {
+      if (!validateApiConfig()) {
+        throw new Error("API configuration is invalid");
+      }
+
+      // Validate file
+      if (file.size > 10 * 1024 * 1024) {
+        // 10MB limit
+        throw new Error("File too large (max 10MB)");
+      }
+
+      const validTypes = ["application/pdf", "text/plain", "text/markdown"];
+      if (!validTypes.includes(file.type)) {
+        throw new Error("Invalid file type. Supported: PDF, TXT, MD");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`${API_URL}/content/create`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "User-Agent": "SmartNotebook/1.0",
+        },
+        body: formData,
+      });
+
+      return handleResponse(response, "uploadSource");
+    } catch (error) {
+      console.error("Source upload error:", error);
+      return handleApiError(error, "uploadSource");
+    }
+  },
+
+  async processContent(
+    content: string,
+    type: string
+  ): Promise<ProcessResponse> {
+    try {
+      if (!validateApiConfig()) {
+        if (OFFLINE_MODE) {
+          return mockResponse({ type: "process", content });
+        }
+        throw new Error("Invalid API configuration");
+      }
+
+      const request = {
+        text: content,
+        outputType: type,
+        includeCitations: true,
+        customization: {
+          format: "structured",
+          tone: "professional",
+          length: "medium",
+        },
+      };
+
+      const response = await fetch(`${API_URL}${ENDPOINTS.create}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          "User-Agent": "SmartNotebook/1.0",
+        },
+        body: JSON.stringify(request),
+      });
+
+      const result = await handleResponse(response, "processContent");
+
+      if (result.request_id) {
+        // Poll for completion
+        let status;
+        do {
+          status = await this.pollStatus(result.request_id);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } while (status.status === "processing");
+
+        if (status.status === "failed") {
+          throw new Error(status.error || "Content processing failed");
+        }
+
+        return {
+          ...status,
+          request_id: result.request_id,
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Content processing error:", error);
+      return handleApiError(error, "processContent");
+    }
+  },
+
+  async analyzeSource(sourceId: string): Promise<any> {
+    try {
+      const response = await fetch(`${API_URL}${ENDPOINTS.studio.analyze}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sourceId,
+          type: "comprehensive",
+          options: {
+            includeSummary: true,
+            includeTopics: true,
+            includeKeywords: true,
+            includeCitations: true,
+          },
+        }),
+      });
+
+      return handleResponse(response, "analyzeSource");
+    } catch (error) {
+      console.error("Source analysis error:", error);
+      return handleApiError(error, "analyzeSource");
+    }
+  },
+};
