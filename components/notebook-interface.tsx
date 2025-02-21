@@ -1,19 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { 
-  Settings, 
-  Share2, 
-  Book, 
-  List, 
-  ChevronDown, 
-  Upload, 
-  Send, 
-  Sparkles, 
-  Info, 
-  HelpCircle, 
+import {
+  Settings,
+  Share2,
+  Book,
+  List,
+  ChevronDown,
+  Upload,
+  Send,
+  Sparkles,
+  Info,
+  HelpCircle,
   MessageSquare,
-  Trash2, 
+  Trash2,
   CheckSquare,
   Loader2
 } from 'lucide-react';
@@ -74,12 +74,12 @@ export function NotebookInterface() {
       id: Date.now().toString(),
       selected: false
     };
-    
+
     storageService.saveSources([...sources, newSource]);
     setSources(prev => [...prev, newSource]);
-    
+
     setSelectedSources([newSource.id]);
-    
+
     setShowUploadModal(false);
   };
 
@@ -88,7 +88,7 @@ export function NotebookInterface() {
       const newSelection = prev.includes(sourceId)
         ? prev.filter(id => id !== sourceId)
         : [...prev, sourceId];
-      
+
       const updatedSources = sources.map(source => ({
         ...source,
         selected: newSelection.includes(source.id)
@@ -96,7 +96,7 @@ export function NotebookInterface() {
       storageService.saveSources(updatedSources);
       setSources(updatedSources);
       setSelectAll(updatedSources.length > 0 && updatedSources.every(s => s.selected));
-      
+
       return newSelection;
     });
   };
@@ -104,7 +104,7 @@ export function NotebookInterface() {
   const handleSelectAll = () => {
     const newSelectAll = !selectAll;
     setSelectAll(newSelectAll);
-    
+
     const updatedSources = storageService.selectAllSources(newSelectAll);
     setSources(updatedSources);
     setSelectedSources(newSelectAll ? updatedSources.map(s => s.id) : []);
@@ -175,9 +175,9 @@ export function NotebookInterface() {
           }
         }
       );
-      
+
       console.log("API Response:", result); // Debugging the response structure
-      
+
       if (result.finalResult?.audio_url) {
         setAudioUrl(result.finalResult.audio_url);
         setShowAudioDialog(true);
@@ -185,7 +185,7 @@ export function NotebookInterface() {
         console.error("Audio URL is missing. Full response:", result);
         throw new Error("No audio URL returned");
       }
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to generate audio overview';
       console.error('Failed to generate audio:', errorMessage);
@@ -246,7 +246,7 @@ export function NotebookInterface() {
       };
 
       const response = await autoContentApi.createContent(request);
-      
+
       if (response.request_id) {
         // Poll for status and update progress
         let result;
@@ -319,7 +319,7 @@ export function NotebookInterface() {
       <Walkthrough />
       <div className="flex h-screen">
         {/* Sources Sidebar */}
-        <div 
+        <div
           className="w-[400px] h-full pt-14 bg-[#1A1B1E] border-r border-[#2B2D31] flex flex-col"
           data-walkthrough="sources"
         >
@@ -362,11 +362,10 @@ export function NotebookInterface() {
                 {sources.map(source => (
                   <div
                     key={source.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer ${
-                      selectedSources.includes(source.id)
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer ${selectedSources.includes(source.id)
                         ? 'bg-[#2B2D31]'
                         : 'hover:bg-[#2B2D31]/50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -408,7 +407,7 @@ export function NotebookInterface() {
         </div>
 
         {/* Main Content */}
-        <div 
+        <div
           className="w-[500px] pt-14 flex flex-col"
           data-walkthrough="chat"
         >
@@ -421,7 +420,7 @@ export function NotebookInterface() {
         </div>
 
         {/* Studio Sidebar */}
-        <div 
+        <div
           className="w-[400px] h-full pt-14 bg-[#1A1B1E] border-l border-[#2B2D31]"
           data-walkthrough="studio"
         >
@@ -445,15 +444,15 @@ export function NotebookInterface() {
                 <TooltipProvider delayDuration={0}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-4 w-4 text-gray-400 hover:text-white hover:bg-[#2B2D31] transition-colors"
                       >
                         <HelpCircle className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent 
+                    <TooltipContent
                       side="right"
                       align="start"
                       className="max-w-sm p-4 bg-[#2B2D31] border-[#3B3D41] shadow-xl rounded-lg"
@@ -481,7 +480,7 @@ export function NotebookInterface() {
               </div>
 
               <div className="bg-[#2B2D31] rounded-lg p-4">
-                <div 
+                <div
                   data-walkthrough="deep-dive"
                   className="flex items-center gap-2 mb-2"
                 >
@@ -492,9 +491,8 @@ export function NotebookInterface() {
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
-                    className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${
-                      selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
+                    className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     disabled={selectedSources.length === 0}
                     onClick={() => handleCustomize('deep_dive')}
                   >
@@ -502,9 +500,8 @@ export function NotebookInterface() {
                   </Button>
                   <Button
                     variant="outline"
-                    className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${
-                      selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
+                    className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     disabled={selectedSources.length === 0 || isGeneratingAudio || showAudioDialog}
                     onClick={() => handleGenerateAudio({ voice1: 'en-US-1', voice2: 'en-US-2' })}
                   >
@@ -517,11 +514,21 @@ export function NotebookInterface() {
                       'Generate'
                     )}
                   </Button>
+
                 </div>
+                {/* Inline audio player displayed if an audio URL exists */}
+                {audioUrl && (
+                  <div className="mt-4">
+                    <h4 className="text-white text-sm font-medium mb-2">Generated Audio</h4>
+                    <audio controls src={audioUrl} className="w-full">
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
-                <h3 
+                <h3
                   className="text-xs font-medium text-gray-400"
                   data-walkthrough="notes"
                 >
@@ -607,7 +614,7 @@ export function NotebookInterface() {
           onGenerate={handleGenerateAudio}
           audioUrl={audioUrl}
         />
-        
+
         <DeepDiveDialog
           isOpen={showDeepDiveDialog}
           onClose={() => setShowDeepDiveDialog(false)}
@@ -615,7 +622,7 @@ export function NotebookInterface() {
           isGenerating={isGeneratingAudio}
           progress={progress}
         />
-        
+
         <ContentGenerationDialog
           isOpen={showGenerationDialog}
           onClose={() => setShowGenerationDialog(false)}
@@ -649,7 +656,7 @@ export function NotebookInterface() {
               };
 
               const response = await autoContentApi.createContent(request);
-              
+
               if (response.request_id) {
                 let result;
                 do {
@@ -711,7 +718,7 @@ export function NotebookInterface() {
               };
 
               const response = await autoContentApi.createContent(request);
-              
+
               if (response.request_id) {
                 let result;
                 do {
