@@ -28,10 +28,18 @@ interface ChatSettings {
   useSourceContext: boolean;
 }
 
-export function ChatInterface({ onShowUpload }: { onShowUpload: () => void }) {
+export function ChatInterface({
+  onShowUpload,
+  generatedSummary,
+}: {
+  onShowUpload: () => void;
+  generatedSummary: { content: string; summary: string } | null;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [generatedSummaryy, setGeneratedSummary] = useState<{ content: string; summary: string } | null>(null);
+
   const [settings, setSettings] = useState<ChatSettings>({
     tone: 'professional',
     length: 'balanced',
@@ -40,6 +48,18 @@ export function ChatInterface({ onShowUpload }: { onShowUpload: () => void }) {
   });
   const [isTyping, setIsTyping] = useState(false);
   const [streamingResponse, setStreamingResponse] = useState('');
+
+    useEffect(() => {
+    if (generatedSummary) {
+      console.log("Generated content received:", generatedSummary.content);
+      setGeneratedSummary(generatedSummary.summary || "No summary available");
+    }
+  }, [generatedSummary]);
+
+  useEffect(() => {
+    console.log("Generated summary set to:", generatedSummary);
+  }, [generatedSummary]);
+
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -63,7 +83,7 @@ export function ChatInterface({ onShowUpload }: { onShowUpload: () => void }) {
       };
 
       const response = await autoContentApi.createContent(request);
-      
+
       if (response.request_id) {
         // Handle streaming response
         let result;
@@ -130,30 +150,62 @@ export function ChatInterface({ onShowUpload }: { onShowUpload: () => void }) {
             </Button>
           </div>
         </div>
-
+  
         {isTyping && (
           <div className="flex items-center gap-2 p-2 text-gray-400 text-sm">
             <div className="flex space-x-1">
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+              <div
+                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: '0.2s' }}
+              />
+              <div
+                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: '0.4s' }}
+              />
             </div>
             <span>Assistant is typing...</span>
           </div>
         )}
-
+  
         {streamingResponse && (
           <div className="p-4 bg-[#2B2D31] rounded-lg animate-in slide-in-from-bottom">
             <p className="text-gray-300">{streamingResponse}</p>
           </div>
         )}
-
+  
+        {/* Generated Summary Block */}
+        {generatedSummary ? (
+          <div className="flex justify-start canvas-slide-in">
+            <div className="max-w-[80%] rounded-lg p-3 text-primary-foreground shadow-lg shadow-primary/20">
+              <div className="text-white text-[16px] leading-[18px] whitespace-pre-wrap">
+                {generatedSummary.summary}
+              </div>
+            </div>
+          </div>
+        ) : isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-secondary rounded-lg p-3 shadow-md">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          </div>
+        )}
+  
+        {/* Render messages */}
         {messages.map((message, index) => (
-          <div key={index} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-lg px-4 py-2 ${
-              message.sender === 'user'
-                ? 'bg-blue-600 text-white'
-                : message.error ? 'bg-red-900/20 border border-red-900/50' : 'bg-[#2B2D31] text-gray-100'
+          <div
+            key={index}
+            className={`flex ${
+              message.sender === 'user' ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                message.sender === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : message.error
+                  ? 'bg-red-900/20 border border-red-900/50'
+                  : 'bg-[#2B2D31] text-gray-100'
               }`}
             >
               <p className="text-sm">{message.text}</p>
@@ -166,7 +218,9 @@ export function ChatInterface({ onShowUpload }: { onShowUpload: () => void }) {
                   <div className="space-y-3">
                     {message.citations.map((citation, idx) => (
                       <div key={idx} className="text-sm">
-                        <p className="text-gray-300 italic mb-1">"{citation.text}"</p>
+                        <p className="text-gray-300 italic mb-1">
+                          "{citation.text}"
+                        </p>
                         <p className="text-gray-400 text-xs flex items-center gap-1">
                           <Book className="h-3 w-3" />
                           {citation.source}
@@ -201,7 +255,7 @@ export function ChatInterface({ onShowUpload }: { onShowUpload: () => void }) {
           </div>
         ))}
       </div>
-
+  
       <div className="p-4 border-t border-[#2B2D31]">
         <div className="flex items-center gap-2">
           <Input
@@ -226,4 +280,5 @@ export function ChatInterface({ onShowUpload }: { onShowUpload: () => void }) {
       </div>
     </div>
   );
+  
 }

@@ -154,6 +154,13 @@ export function useGemini() {
     );
   }, [handleOperation]);
 
+  const generateSummary = useCallback(async (text: string) => {
+    return handleOperation(
+      () => geminiService.generateSummary(text),
+      `summary:${text.slice(0, 50)}`
+    );
+  }, [handleOperation]);
+
   const clearCache = useCallback(() => {
     cache.clear();
   }, []);
@@ -170,6 +177,7 @@ export function useGemini() {
     generateQuestions,
     compareDocuments,
     generateTimeline,
-    clearCache
+    clearCache,
+    generateSummary
   };
 }

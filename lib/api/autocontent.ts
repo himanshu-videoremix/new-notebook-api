@@ -1,4 +1,5 @@
-import { ModifyPodcastRequest, ModifyPodcastResponse, ProcessResponse } from "./types";
+import { ProcessRequest } from "../api";
+import { ContentStatus, handleApiError, handleApiResponse, ModifyPodcastRequest, ModifyPodcastResponse, ProcessResponse, validateApiConfig } from "./types";
 
 // API Configuration
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -481,226 +482,6 @@ export const autoContentApi = {
     throw new Error("Operation timed out");
   },
 
-  // async getAvailableVoices(): Promise<Voice[]> {
-  //   try {
-  //     if (!API_KEY) {
-  //       console.warn('API key missing - using default voices');
-  //       return this.getDefaultVoices();
-  //     }
-
-  //     // Retry configuration
-  //     const maxRetries = 3;
-  //     const retryDelay = 1000;
-  //     let attempt = 0;
-  //     let lastError: Error | null = null;
-
-  //     try {
-  //       // Retry loop
-  //       while (attempt < maxRetries) {
-  //         // Add exponential backoff delay after first attempt
-  //         if (attempt > 0) {
-  //           await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt - 1)));
-  //         }
-
-  //         try {
-  //           // Check network connectivity
-  //           if (typeof window !== 'undefined' && !window.navigator.onLine) {
-  //             console.warn('No internet connection, using default voices');
-  //             return this.getDefaultVoices();
-  //           }
-
-  //           const response = await fetch(`${API_URL}${ENDPOINTS.getVoices}`, {
-  //             headers: {
-  //               'Authorization': `Bearer ${API_KEY}`,
-  //               'Content-Type': 'application/json',
-  //               'Accept': 'application/json',
-  //               'User-Agent': 'SmartNotebook/1.0'
-  //             },
-  //             signal: AbortSignal.timeout(10000) // Increase timeout to 10s
-  //           });
-
-  //           if (!response.ok) {
-  //             const errorText = await response.text();
-  //             console.warn(`Voice API error: ${response.status} - ${errorText}`);
-  //             return this.getDefaultVoices();
-  //           }
-
-  //           const voices = await response.json();
-
-  //           // Handle both array and { data: [] } response formats
-  //           const voiceData = Array.isArray(voices) ? voices : voices?.data;
-
-  //           if (!Array.isArray(voiceData)) {
-  //             throw new Error('Invalid voice data format');
-  //           }
-
-  //           // Filter to only English voices and format them
-  //           const englishVoices = voiceData
-  //             .filter(voice => {
-  //               return voice.name &&
-  //                      voice.id &&
-  //                      voice.language?.startsWith('en') &&
-  //                      (!voice.status || voice.status === 'active');
-  //             })
-  //             .map(voice => ({
-  //               id: voice.id.toString(),
-  //               name: voice.name,
-  //               language: voice.language || 'en-US',
-  //               gender: voice.gender || 'unknown',
-  //               isCloned: Boolean(voice.is_cloned || voice.isCloned),
-  //               accent: voice.accent || 'neutral',
-  //               preview_url: voice.preview_url || null,
-  //               style: voice.style || 'neutral',
-  //               age: voice.age || 'adult',
-  //               emotion: voice.emotion || 'neutral',
-  //               speed_range: voice.speed_range || { min: 0.8, max: 1.2 },
-  //               pitch_range: voice.pitch_range || { min: 0.8, max: 1.2 },
-  //               emphasis_levels: voice.emphasis_levels || ['light', 'moderate', 'strong'],
-  //               emotion_intensities: voice.emotion_intensities || ['low', 'medium', 'high']
-  //             }));
-
-  //           if (englishVoices.length === 0) {
-  //             throw new Error('No valid voices found');
-  //           }
-
-  //           return englishVoices;
-  //         } catch (error) {
-  //           const isNetworkError = error instanceof Error && (
-  //             error.name === 'TypeError' ||
-  //             error.name === 'AbortError' ||
-  //             error.message.includes('Failed to fetch') ||
-  //             error.message.includes('Network request failed') ||
-  //             error.message.includes('No internet connection')
-  //           );
-
-  //           // Only retry on network errors
-  //           if (!isNetworkError) {
-  //             throw error; // Don't retry non-network errors
-  //           }
-
-  //           attempt++;
-
-  //           if (attempt >= maxRetries || !window.navigator.onLine) {
-  //             throw new Error(`Voice API failed after ${maxRetries} attempts`);
-  //           }
-
-  //           // Wait before retrying
-  //           await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
-  //         }
-  //       }
-
-  //       throw new Error('Failed to fetch voices');
-  //     } catch (error) {
-  //       // If all retries failed, fall back to default voices
-  //       console.warn('Falling back to default voices:', error);
-  //       return this.getDefaultVoices();
-  //     }
-  //   } catch (error) {
-  //     console.error('Voice initialization error:', error);
-  //     return this.getDefaultVoices();
-  //   }
-  // },
-
-  // getDefaultVoices(): Voice[] {
-  //   const defaultVoices = [
-  //     // American English
-  //     { id: 'en_us_001', name: 'Matthew', language: 'en-US', gender: 'm', accent: 'american' },
-  //     { id: 'en_us_002', name: 'Joanna', language: 'en-US', gender: 'f', accent: 'american' },
-  //     { id: 'en_us_003', name: 'Ivy', language: 'en-US', gender: 'f', accent: 'american' },
-  //     { id: 'en_us_004', name: 'Justin', language: 'en-US', gender: 'm', accent: 'american' },
-  //     { id: 'en_us_005', name: 'Kendra', language: 'en-US', gender: 'f', accent: 'american' },
-  //     { id: 'en_us_006', name: 'Kevin', language: 'en-US', gender: 'm', accent: 'american' },
-  //     // British English
-  //     { id: 'en_uk_001', name: 'Emma', language: 'en-GB', gender: 'f', accent: 'british' },
-  //     { id: 'en_uk_002', name: 'Brian', language: 'en-GB', gender: 'm', accent: 'british' },
-  //     { id: 'en_uk_003', name: 'Amy', language: 'en-GB', gender: 'f', accent: 'british' },
-  //     // Australian English
-  //     { id: 'en_au_001', name: 'Nicole', language: 'en-AU', gender: 'f', accent: 'australian' },
-  //     { id: 'en_au_002', name: 'Russell', language: 'en-AU', gender: 'm', accent: 'australian' },
-  //     // Indian English
-  //     { id: 'en_in_001', name: 'Aditi', language: 'en-IN', gender: 'f', accent: 'indian' },
-  //     { id: 'en_in_002', name: 'Raveena', language: 'en-IN', gender: 'f', accent: 'indian' }
-  //   ].map(voice => ({
-  //     ...voice,
-  //     preview_url: `${API_URL}/Content/VoicePreview/${voice.id}` // Add preview URL for default voices
-  //   }));
-  //   return defaultVoices;
-  // },
-
-  // async cloneVoice(audioFile: File, name: string): Promise<Voice> {
-  //   try {
-  //     if (!API_KEY) {
-  //       throw new Error('API key is missing');
-  //     }
-
-  //     // Validate file size (max 10MB)
-  //     if (audioFile.size > 10 * 1024 * 1024) {
-  //       throw new Error('Audio file must be under 10MB');
-  //     }
-
-  //     // Validate file type
-  //     if (!audioFile.type.startsWith('audio/')) {
-  //       throw new Error('Invalid file type. Must be an audio file.');
-  //     }
-
-  //     const formData = new FormData();
-  //     formData.append('audio', audioFile);
-  //     formData.append('name', name);
-
-  //     const response = await fetch(`${API_URL}${ENDPOINTS.cloneVoice}`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Authorization': `Bearer ${API_KEY}`,
-  //         'Accept': 'application/json',
-  //         'User-Agent': 'SmartNotebook/1.0'
-  //       },
-  //       body: formData
-  //     });
-
-  //     if (!response.ok) {
-  //       const errorData = await response.text();
-  //       throw new Error(`Voice cloning failed: ${errorData}`);
-  //     }
-
-  //     const result = await response.json();
-
-  //     // Poll for completion if needed
-  //     if (result.request_id) {
-  //       const cloneStatus = await this.pollStatus(result.request_id);
-  //       if (cloneStatus.status === 'failed') {
-  //         throw new Error(cloneStatus.error || 'Voice cloning failed');
-  //       }
-  //     }
-
-  //     // Return formatted voice object
-  //     return {
-  //       id: result.voice_id || result.voiceId,
-  //       name: result.name,
-  //       language: 'en-US',
-  //       isCloned: true,
-  //       sourceAudio: result.source_audio || result.sourceAudio,
-  //       preview_url: result.preview_url || result.previewUrl,
-  //       gender: result.gender || 'unknown',
-  //       accent: result.accent || 'neutral',
-  //       settings: {
-  //         speed_range: { min: 0.8, max: 1.2 },
-  //         pitch_range: { min: 0.8, max: 1.2 },
-  //         emphasis_levels: ['light', 'moderate', 'strong'],
-  //         emotion_intensities: ['low', 'medium', 'high']
-  //       }
-  //     };
-  //   } catch (error) {
-  //     console.error('Voice cloning error:', {
-  //       error: error instanceof Error ? error.message : 'Unknown error',
-  //       fileName: audioFile.name,
-  //       fileSize: audioFile.size,
-  //       fileType: audioFile.type,
-  //       timestamp: new Date().toISOString()
-  //     });
-  //     throw error;
-  //   }
-  // },
-
   async uploadSource(file: File): Promise<ProcessResponse> {
     try {
       if (!validateApiConfig()) {
@@ -823,4 +604,49 @@ export const autoContentApi = {
       return handleApiError(error, "analyzeSource");
     }
   },
+
+  async createContent(request: ProcessRequest): Promise<ProcessResponse> {
+    try {
+      if (!validateApiConfig()) {
+        if (OFFLINE_MODE) {
+          return mockResponse(request);
+        }
+        throw new Error('API configuration is invalid');
+      }
+
+      const response = await fetch(`/api/content`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'SmartNotebook/1.0'
+        },
+        body: JSON.stringify(request)
+      });
+
+      return handleApiResponse(response, 'createContent');
+    } catch (error) {
+      return handleApiError(error, 'createContent');
+    }
+  },
+  
+  async getContentStatus(id: string): Promise<ContentStatus> {
+    try {
+      if (!validateApiConfig()) {
+        throw new Error('Invalid API configuration');
+      }
+
+      const response = await fetch(`${API_URL}${ENDPOINTS.status}/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      return handleApiResponse(response, 'getContentStatus');
+    } catch (error) {
+      return handleApiError(error, 'getContentStatus');
+    }
+  },
+
 };

@@ -33,7 +33,8 @@ import { storageService } from '@/lib/storage';
 import type { ProcessRequest } from '@/lib/types/api';
 import { NotebookSkeleton } from '@/components/notebook-skeleton';
 import { Walkthrough } from '@/components/walkthrough';
-
+import { api } from '@/lib/api';
+import { useApiFeatures } from '@/hooks/use-api-features';
 export function NotebookInterface() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
@@ -53,6 +54,11 @@ export function NotebookInterface() {
   const [selectAll, setSelectAll] = useState(false);
   const { toast } = useToast();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [generatedSummary, setgeneratedSummary] = useState<{
+  } | null>(null);
+  const { data, createContent, status, error } = useApiFeatures();
+  const [messages, setMessages] = useState([]);
+
 
   // Load saved sources on mount
   useEffect(() => {
@@ -68,6 +74,61 @@ export function NotebookInterface() {
   if (!isInitialized) {
     return null;
   }
+
+    const handleSourceSelection = async (outputType: string, index: number) => {
+      if (sources.length === 0) {
+        toast({ title: "Error", description: "Please add some sources first", variant: "destructive" });
+        return;
+      }
+    
+      // Toggle selected state in sources array
+      setSources(prevSources =>
+        prevSources.map((source, i) =>
+          i === index ? { ...source, selected: !source.selected } : source
+        )
+      );
+    
+      // Update selectedSources based on toggled state
+      setSelectedSources(prevSelected => {
+        const sourceId = sources[index].id;
+        return prevSelected.includes(sourceId)
+          ? prevSelected.filter(id => id !== sourceId)
+          : [...prevSelected, sourceId];
+      });
+
+    setIsGenerating(true);
+
+    try {
+      const request = {
+        text: "Sample input text",
+        outputType,
+        resources: sources.map((s) => ({ content: s.content, type: s.type })),
+        customization: {},
+      };
+
+      const result = await createContent(request);
+
+      console.log("Generated result:", result);
+
+      if (result && result.text) {
+        console.log("Setting generated summary ===========================", result.text);
+        setgeneratedSummary({
+          content: result.text,
+          summary: result.text,
+        });
+      } else {
+        setgeneratedSummary({
+          content: "No content generated",
+          summary: "No summary available",
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to generate content", variant: "destructive" });
+    }
+
+    setIsGenerating(false);
+  };
+
   const handleUploadComplete = (resource: any) => {
     const newSource = {
       ...resource,
@@ -359,18 +420,18 @@ export function NotebookInterface() {
           <div className="flex-1 mt-4 overflow-y-auto">
             {sources.length > 0 ? (
               <div className="space-y-2 p-4">
-                {sources.map(source => (
+                {sources.map((source, index) => (
                   <div
                     key={source.id}
                     className={`flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer ${selectedSources.includes(source.id)
-                        ? 'bg-[#2B2D31]'
-                        : 'hover:bg-[#2B2D31]/50'
+                      ? 'bg-[#2B2D31]'
+                      : 'hover:bg-[#2B2D31]/50'
                       }`}
                   >
                     <input
                       type="checkbox"
-                      checked={selectedSources.includes(source.id)}
-                      onChange={() => handleSourceSelect(source.id)}
+                      checked={source.selected}
+                      onChange={() => handleSourceSelection('summary', index)}
                       className="h-4 w-4 rounded border-gray-600 bg-gray-700 checked:bg-blue-500"
                     />
                     <div className="flex-1 min-w-0" onClick={() => handleSourceSelect(source.id)}>
@@ -413,9 +474,15 @@ export function NotebookInterface() {
         >
           <Suspense fallback={<div className="flex-1 flex items-center justify-center">
             <div className="animate-pulse">Loading chat...</div>
-          }
+
           </div>}>
-            <ChatInterface onShowUpload={() => setShowUpload(true)} />
+            <ChatInterface
+              onShowUpload={() => setShowUpload(true)}
+              sources={sources}
+              suggesstionMessages={messages}
+              generatedSummary={generatedSummary}
+            />
+
           </Suspense>
         </div>
 
@@ -761,6 +828,14 @@ export function NotebookInterface() {
           onClose={() => setShowUpload(false)}
           onUploadComplete={handleUploadComplete}
         />
+        {/* <ChatInterface
+              onShowUpload={() => setShowUploadModal(true)}
+              // generatedContent={generatedContent}
+              sources={sources}
+              suggesstionMessages={messages}
+              generatedSummary={generatedSummary} // Ensure correct data is passed
+
+            /> */}
       </div>
     </div>
   );

@@ -37,6 +37,12 @@ export interface ApiError extends Error {
   code?: string;
 }
 
+export interface ContentStatus {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress?: number;
+  error?: string;
+  result?: any;
+}
 // API Response Types
 export interface ApiResponse<T = any> {
   data?: T;
