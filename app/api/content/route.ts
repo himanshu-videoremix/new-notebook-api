@@ -24,11 +24,11 @@ async function checkStatusWithPolling(requestId) {
       }
       
       // Check if more than 3 minutes have elapsed
-      if (Date.now() - startTime > 600000) {
+      if (Date.now() - startTime > 1500000) {
         console.log("⏳ Request pending for more than 3 minutes.");
         return {
           status: data.status,
-          message: "Your request has been pending for over 10 minutes. Please check back later."
+          message: "Your request has been pending for over 25 minutes. Please check back later."
         };
       }
     } catch (error) {
