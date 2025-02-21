@@ -76,5 +76,5 @@ async function saveFileLocally(file: FormDataEntryValue): Promise<string> {
 
   // Construct the public URL.
   // IMPORTANT: Ensure that your domain (or localhost during development) is accessible to the external API.
-  return `http://localhost:3002/media/${fileName}`;
+  return `http://167.71.188.184:1340/media/${fileName}`;
 }
