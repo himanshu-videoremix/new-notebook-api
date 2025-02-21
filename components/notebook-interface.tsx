@@ -37,7 +37,7 @@ import { useApiFeatures } from '@/hooks/use-api-features';
 
 export function NotebookInterface() {
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showAudioDialog, setShowAudioDialog] = useState(true);
+  const [showAudioDialog, setShowAudioDialog] = useState(false);
   const [showDeepDiveDialog, setShowDeepDiveDialog] = useState(false);
   const [showBriefingDialog, setShowBriefingDialog] = useState(false);
   const [showStudyGuideDialog, setShowStudyGuideDialog] = useState(false);
