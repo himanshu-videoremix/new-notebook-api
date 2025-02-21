@@ -178,24 +178,31 @@ export const autoContentApi = {
   async cloneVoice(audioFile: File, name: string): Promise<Voice> {
     try {
       if (!API_KEY) {
+        console.log("API key is missing");
         throw new Error("API key is missing");
       }
-
+  
+      console.log("Received file:", audioFile.name, "Size:", audioFile.size, "Type:", audioFile.type);
+  
       // Validate file size (max 10MB)
       if (audioFile.size > 10 * 1024 * 1024) {
+        console.log("Audio file too large:", audioFile.size);
         throw new Error("Audio file must be under 10MB");
       }
-
+  
       // Validate file type
       if (!audioFile.type.startsWith("audio/")) {
+        console.log("Invalid file type:", audioFile.type);
         throw new Error("Invalid file type. Must be an audio file.");
       }
-
+  
       const formData = new FormData();
       formData.append("audio", audioFile);
       formData.append("name", name);
-
-      const response = await fetch(`${API_URL}/content/CloneVoice`, {
+  
+      console.log("Sending POST request to /api/clonevoice with name:", name);
+      
+      const response = await fetch(`/api/clonevoice`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${API_KEY}`,
@@ -203,24 +210,30 @@ export const autoContentApi = {
         },
         body: formData,
       });
-
+      console.log("REsponse", response);
+      console.log("Response status:", response.status);
+  
       if (!response.ok) {
         const errorData = await response.text();
+        console.log("Error data from server:", errorData);
         throw new Error(`Voice cloning failed: ${errorData}`);
       }
-
+  
       const result = await response.json();
-
+      console.log("Received result:", result);
+  
       // Poll for completion if needed
       if (result.request_id) {
+        console.log("Polling status for request_id:", result.request_id);
         const cloneStatus = await this.pollStatus(result.request_id);
+        console.log("Clone status:", cloneStatus);
         if (cloneStatus.status === "failed") {
           throw new Error(cloneStatus.error || "Voice cloning failed");
         }
       }
-
+  
       // Return formatted voice object
-      return {
+      const voiceObject = {
         id: result.voice_id || result.voiceId,
         name: result.name,
         language: "en-US",
@@ -236,6 +249,9 @@ export const autoContentApi = {
           emotion_intensities: ["low", "medium", "high"],
         },
       };
+  
+      console.log("Voice cloning successful:", voiceObject);
+      return voiceObject;
     } catch (error) {
       console.error("Voice cloning error:", {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -247,6 +263,7 @@ export const autoContentApi = {
       throw error;
     }
   },
+  
 
   async getAvailableVoices(): Promise<Voice[]> {
     try {

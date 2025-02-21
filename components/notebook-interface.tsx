@@ -33,8 +33,8 @@ import { storageService } from '@/lib/storage';
 import type { ProcessRequest } from '@/lib/types/api';
 import { NotebookSkeleton } from '@/components/notebook-skeleton';
 import { Walkthrough } from '@/components/walkthrough';
-import { api } from '@/lib/api';
 import { useApiFeatures } from '@/hooks/use-api-features';
+
 export function NotebookInterface() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
@@ -54,11 +54,12 @@ export function NotebookInterface() {
   const [selectAll, setSelectAll] = useState(false);
   const { toast } = useToast();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [notes, setNotes] = useState([]);
   const [generatedSummary, setgeneratedSummary] = useState<{
+
   } | null>(null);
   const { data, createContent, status, error } = useApiFeatures();
   const [messages, setMessages] = useState([]);
-
 
   // Load saved sources on mount
   useEffect(() => {
@@ -74,61 +75,6 @@ export function NotebookInterface() {
   if (!isInitialized) {
     return null;
   }
-
-    const handleSourceSelection = async (outputType: string, index: number) => {
-      if (sources.length === 0) {
-        toast({ title: "Error", description: "Please add some sources first", variant: "destructive" });
-        return;
-      }
-    
-      // Toggle selected state in sources array
-      setSources(prevSources =>
-        prevSources.map((source, i) =>
-          i === index ? { ...source, selected: !source.selected } : source
-        )
-      );
-    
-      // Update selectedSources based on toggled state
-      setSelectedSources(prevSelected => {
-        const sourceId = sources[index].id;
-        return prevSelected.includes(sourceId)
-          ? prevSelected.filter(id => id !== sourceId)
-          : [...prevSelected, sourceId];
-      });
-
-    setIsGenerating(true);
-
-    try {
-      const request = {
-        text: "Sample input text",
-        outputType,
-        resources: sources.map((s) => ({ content: s.content, type: s.type })),
-        customization: {},
-      };
-
-      const result = await createContent(request);
-
-      console.log("Generated result:", result);
-
-      if (result && result.text) {
-        console.log("Setting generated summary ===========================", result.text);
-        setgeneratedSummary({
-          content: result.text,
-          summary: result.text,
-        });
-      } else {
-        setgeneratedSummary({
-          content: "No content generated",
-          summary: "No summary available",
-        });
-      }
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to generate content", variant: "destructive" });
-    }
-
-    setIsGenerating(false);
-  };
-
   const handleUploadComplete = (resource: any) => {
     const newSource = {
       ...resource,
@@ -160,6 +106,67 @@ export function NotebookInterface() {
 
       return newSelection;
     });
+  };
+
+  const handleSourceSelection = async (outputType, index) => {
+    if (sources.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add some sources first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Toggle the selected state for the source in the sources array.
+    setSources((prevSources) =>
+      prevSources.map((source, i) =>
+        i === index ? { ...source, selected: !source.selected } : source
+      )
+    );
+
+    // Update the selectedSources state based on whether the source is already selected.
+    const sourceId = sources[index].id;
+    setSelectedSources((prevSelected) =>
+      prevSelected.includes(sourceId)
+        ? prevSelected.filter((id) => id !== sourceId)
+        : [...prevSelected, sourceId]
+    );
+
+    setIsGenerating(true);
+
+    try {
+      const requestData = {
+        text: "Sample input text",
+        outputType,
+        resources: sources.map((s) => ({ content: s.content, type: s.type })),
+        customization: {},
+      };
+
+      const result = await createContent(requestData);
+      console.log("Generated result:", result);
+
+      if (result && result.text) {
+        console.log("Setting generated summary:", result.text);
+        setgeneratedSummary({
+          content: result.text,
+          summary: result.text,
+        });
+      } else {
+        setgeneratedSummary({
+          content: "No content generated",
+          summary: "No summary available",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate content",
+        variant: "destructive",
+      });
+    }
+
+    setIsGenerating(false);
   };
 
   const handleSelectAll = () => {
@@ -359,7 +366,7 @@ export function NotebookInterface() {
           type,
           timestamp: new Date().toISOString()
         };
-        // Update notes state
+        setNotes((prevNotes) => [note, ...prevNotes]);
         break;
       default:
         console.warn('Unhandled content type:', type);
@@ -424,17 +431,20 @@ export function NotebookInterface() {
                   <div
                     key={source.id}
                     className={`flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer ${selectedSources.includes(source.id)
-                      ? 'bg-[#2B2D31]'
-                      : 'hover:bg-[#2B2D31]/50'
+                      ? "bg-[#2B2D31]"
+                      : "hover:bg-[#2B2D31]/50"
                       }`}
                   >
                     <input
                       type="checkbox"
-                      checked={source.selected}
-                      onChange={() => handleSourceSelection('summary', index)}
+                      checked={selectedSources.includes(source.id)}
+                      onChange={() => handleSourceSelection("summary", index)}
                       className="h-4 w-4 rounded border-gray-600 bg-gray-700 checked:bg-blue-500"
                     />
-                    <div className="flex-1 min-w-0" onClick={() => handleSourceSelect(source.id)}>
+                    <div
+                      className="flex-1 min-w-0"
+                      onClick={() => handleSourceSelect(source.id)}
+                    >
                       <p className="text-sm font-medium text-white truncate">
                         {source.title}
                       </p>
@@ -456,15 +466,14 @@ export function NotebookInterface() {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
                 <Upload className="h-6 w-6 mb-2" />
-                <p className="text-sm text-center">
-                  Saved sources will appear here
-                </p>
+                <p className="text-sm text-center">Saved sources will appear here</p>
                 <p className="text-xs text-center mt-1">
                   Click Add source above to add PDFs, websites, text, videos, or audio files.
                 </p>
               </div>
             )}
           </div>
+
         </div>
 
         {/* Main Content */}
@@ -482,7 +491,6 @@ export function NotebookInterface() {
               suggesstionMessages={messages}
               generatedSummary={generatedSummary}
             />
-
           </Suspense>
         </div>
 
@@ -581,17 +589,7 @@ export function NotebookInterface() {
                       'Generate'
                     )}
                   </Button>
-
                 </div>
-                {/* Inline audio player displayed if an audio URL exists */}
-                {audioUrl && (
-                  <div className="mt-4">
-                    <h4 className="text-white text-sm font-medium mb-2">Generated Audio</h4>
-                    <audio controls src={audioUrl} className="w-full">
-                      Your browser does not support the audio element.
-                    </audio>
-                  </div>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -660,6 +658,22 @@ export function NotebookInterface() {
                     Outline
                   </Button>
                 </div>
+
+                {/* Display generated content */}
+                <div className="generated-content mt-4">
+                  {notes.length > 0 ? (
+                    notes.map((note) => (
+                      <div key={note.id} className="p-4 mb-2 border rounded bg-gray-800">
+                        <h2 className="text-lg font-semibold">{note.title}</h2>
+                        <p className="mt-2 text-sm">{note.content}</p>
+                        <small className="text-gray-500">{new Date(note.timestamp).toLocaleString()}</small>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-400">No generated content yet.</p>
+                  )}
+                </div>
+
 
                 <div className="flex flex-col items-center justify-center h-48 text-gray-500 mt-8">
                   <Book className="h-6 w-6 mb-2" />
@@ -828,14 +842,6 @@ export function NotebookInterface() {
           onClose={() => setShowUpload(false)}
           onUploadComplete={handleUploadComplete}
         />
-        {/* <ChatInterface
-              onShowUpload={() => setShowUploadModal(true)}
-              // generatedContent={generatedContent}
-              sources={sources}
-              suggesstionMessages={messages}
-              generatedSummary={generatedSummary} // Ensure correct data is passed
-
-            /> */}
       </div>
     </div>
   );
