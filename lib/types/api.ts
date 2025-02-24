@@ -285,7 +285,7 @@ export function DeepDiveDialog({
       });
     }
 
-  return (
+  return(
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] max-w-[1000px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-lg border-gray-700/50 shadow-xl">
         <DialogHeader>
@@ -854,7 +854,6 @@ export function DeepDiveDialog({
                   )}
                 </div>
 
-                {/* Sound Effects */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label className="flex items-center gap-2">
@@ -863,4 +862,23 @@ export function DeepDiveDialog({
                     </Label>
                     <Switch
                       checked={audioSettings.soundEffects.enabled}
-                      onCheckedChange={(enabled)
+                      onCheckedChange={(enabled) => setAudioSettings(prev => ({
+                        ...prev,
+                        soundEffects: { ...prev.soundEffects, enabled }
+                      }))}
+                    />
+                  </div>
+                  {audioSettings.soundEffects.enabled && (
+                    <div className="space-y-4 pl-6">
+                      {/* Additional settings for sound effects can go here */}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

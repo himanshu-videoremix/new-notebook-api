@@ -15,7 +15,9 @@ import {
   MessageSquare,
   Trash2,
   CheckSquare,
-  Loader2
+  Loader2,
+  Edit,
+  PlayCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,8 +36,19 @@ import type { ProcessRequest } from '@/lib/types/api';
 import { NotebookSkeleton } from '@/components/notebook-skeleton';
 import { Walkthrough } from '@/components/walkthrough';
 import { useApiFeatures } from '@/hooks/use-api-features';
+import { Label } from 'recharts';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useVoices } from '@/hooks/use-voices';
 
 export function NotebookInterface() {
+  const staticAudioUrl = "https://autocontentapi.blob.core.windows.net/audios/67fa9f5b-3d38-4382-abf8-13f7d103d817_20250224092847.wav";
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
   const [showDeepDiveDialog, setShowDeepDiveDialog] = useState(false);
@@ -47,7 +60,9 @@ export function NotebookInterface() {
   const [selectedContentType, setSelectedContentType] = useState('');
   const [sources, setSources] = useState<any[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
-  const [audioUrl, setAudioUrl] = useState<string>();
+  // const [audioUrl, setAudioUrl] = useState<string>();
+  const [audioUrl, setAudioUrl] = useState(staticAudioUrl);
+
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -55,11 +70,20 @@ export function NotebookInterface() {
   const { toast } = useToast();
   const [isInitialized, setIsInitialized] = useState(false);
   const [notes, setNotes] = useState([]);
+  const [isModifying, setIsModifying] = useState(false);
+  const [modificationInstructions, setModificationInstructions] = useState('');
   const [generatedSummary, setgeneratedSummary] = useState<{
-
   } | null>(null);
+  const [modifiedAudioUrl, setModifiedAudioUrl] = useState<string | null>(null);
+  
   const { data, createContent, status, error } = useApiFeatures();
   const [messages, setMessages] = useState([]);
+  const { voices, isLoading: voicesLoading, handleVoiceCreated, playVoicePreview } = useVoices();
+  const [selectedVoices, setSelectedVoices] = useState<{ voice1: string; voice2: string }>({
+    voice1: '142',
+    voice2: '20'
+  });
+
 
   // Load saved sources on mount
   useEffect(() => {
@@ -184,6 +208,50 @@ export function NotebookInterface() {
     setSelectedSources(prev => prev.filter(id => id !== sourceId));
     setSelectAll(updatedSources.length > 0 && updatedSources.every(s => s.selected));
   };
+
+  const handleModifyPodcast = async (options: { voice1: string; voice2: string }) => {
+    console.log('handleModifyPodcast');
+
+    if (!audioUrl) {
+      toast({
+        title: "No audio found",
+        description: "Please provide an audio URL to modify.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsModifying(true);
+    try {
+      const result = await autoContentApi.modifyPodcast({
+        audioUrl: audioUrl,
+        voice1: options.voice1,
+        voice2: options.voice2,
+        instructions: modificationInstructions,
+        callbackData: 'optional-callback-data'
+      });
+
+      console.log('API Response:', result);
+
+      if (result.finalResult?.audio_url) {
+        console.log(`Final modified audio available at: ${result.finalResult.audio_url}`);
+        setModifiedAudioUrl(result.finalResult.audio_url);
+        setShowAudioDialog(true);
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to modify podcast';
+      console.error('Error modifying podcast:', errorMessage);
+      toast({
+        title: "Podcast modification failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsModifying(false);
+    }
+  };
+
 
   const handleGenerateAudio = async (options: { voice1: string; voice2: string }) => {
     if (selectedSources.length === 0) {
@@ -556,14 +624,12 @@ export function NotebookInterface() {
               </div>
 
               <div className="bg-[#2B2D31] rounded-lg p-4">
-                <div
-                  data-walkthrough="deep-dive"
-                  className="flex items-center gap-2 mb-2"
-                >
+                <div className="flex items-center gap-2 mb-2" data-walkthrough="deep-dive">
                   <MessageSquare className="h-4 w-4 text-blue-500" />
                   <h3 className="text-sm font-medium text-white">Deep Dive conversation</h3>
                 </div>
                 <p className="text-xs text-gray-400 mb-3">Two hosts (English only)</p>
+
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
@@ -574,6 +640,7 @@ export function NotebookInterface() {
                   >
                     Customize
                   </Button>
+
                   <Button
                     variant="outline"
                     className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
@@ -591,6 +658,168 @@ export function NotebookInterface() {
                     )}
                   </Button>
                 </div>
+
+                {audioUrl && (
+                  <div className="mt-4">
+                    <h4 className="text-white text-sm font-medium mb-2">Generated Audio</h4>
+                    <audio controls src={audioUrl} className="w-full">
+                      Your browser does not support the audio element.
+                    </audio>
+
+
+                    <div className="space-y-4">
+                      {/* Modification Instructions */}
+                      <div className="grid gap-2">
+                        <Label>Modification Instructions</Label>
+                        <textarea
+                          className="w-full p-2 bg-[#3B3D41] text-white rounded-lg mb-2 text-sm mt-[10px]"
+                          placeholder="Enter modification instructions..."
+                          value={modificationInstructions}
+                          onChange={(e) => setModificationInstructions(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Speaker 1 Voice Selection */}
+                      <div className="grid gap-2">
+                        {/* <Label>First Speaker Voice</Label>
+                         */}
+                        <span>Select Voice 1</span>
+                        <Select
+                          value={selectedVoices.voice1}
+                          onValueChange={(v) =>
+                            setSelectedVoices((prev) => ({ ...prev, voice1: v }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select voice" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {voices.map((voice) => (
+                              <SelectItem
+                                key={voice.id}
+                                value={voice.id}
+                                disabled={voice.id === selectedVoices.voice2}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span>
+                                    {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`ml-2 ${!voice.preview_url ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (voice.preview_url) {
+                                        try {
+                                          playVoicePreview(voice.preview_url);
+                                        } catch (error) {
+                                          toast({
+                                            title: "Preview failed",
+                                            description: "Could not play voice preview",
+                                            variant: "destructive",
+                                          });
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <PlayCircle className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Speaker 2 Voice Selection */}
+                      <div className="grid gap-2">
+                        {/* <Label>Second Speaker Voice</Label> */}
+                        <span>Select Voice 2</span>
+
+                        <Select
+                          value={selectedVoices.voice2}
+                          onValueChange={(v) =>
+                            setSelectedVoices((prev) => ({ ...prev, voice2: v }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select voice" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {voices.map((voice) => (
+                              <SelectItem
+                                key={voice.id}
+                                value={voice.id}
+                                disabled={voice.id === selectedVoices.voice1}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span>
+                                    {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`ml-2 ${!voice.preview_url ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (voice.preview_url) {
+                                        try {
+                                          playVoicePreview(voice.preview_url);
+                                        } catch (error) {
+                                          toast({
+                                            title: "Preview failed",
+                                            description: "Could not play voice preview",
+                                            variant: "destructive",
+                                          });
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <PlayCircle className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Modify Podcast Button */}
+                      <Button
+                        variant="outline"
+                        className="w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41]"
+                        disabled={isModifying || !modificationInstructions || !selectedVoices.voice1 || !selectedVoices.voice2}
+                        onClick={() => handleModifyPodcast({
+                          instructions: modificationInstructions,
+                          voice1: selectedVoices.voice1,
+                          voice2: selectedVoices.voice2
+                        })}
+
+                      >
+                        {isModifying ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Modifying...</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Edit className="w-4 h-4" />
+                            <span>Modify Podcast</span>
+                          </div>
+                        )}
+                      </Button>
+                    </div>
+                    {modifiedAudioUrl && (
+                      <div className="mt-4">
+                        <h4 className="text-white text-sm font-medium mb-2">Modified Audio</h4>
+                        <audio controls src={modifiedAudioUrl} className="w-full">
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

@@ -3,6 +3,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const AUTOCONTENT_API_URL = "https://api.autocontentapi.com/v1";
 
+import { autoContentApi } from './api';
+import { ModifyPodcastRequest } from './api/types';
 import { ProcessRequest, ProcessResponse, ContentStatus } from './types/api';
 
 
@@ -684,13 +686,6 @@ export const api = {
     }
   },
 
-  async getStudioData() {
-    try {
-      if (!validateApiConfig()) {
-        if (process.env.NODE_ENV !== 'development') {
-          throw new Error('Invalid API configuration');
-        }
-
   async modifyPodcast(audioUrl: string, voice1: number, voice2: number, instructions?: string) {
     try {
       const request: ModifyPodcastRequest = {
@@ -699,13 +694,13 @@ export const api = {
         voice2,
         instructions
       };
-
+  
       const response = await autoContentApi.modifyPodcast(request);
-      
+  
       if (response.errorMessage) {
         throw new Error(response.errorMessage);
       }
-
+  
       // Poll for status if needed
       if (response.requestId) {
         const result = await autoContentApi.pollStatus(response.requestId);
@@ -717,13 +712,13 @@ export const api = {
         }
         throw new Error('Podcast modification failed or timed out');
       }
-
+  
       return response;
     } catch (error) {
       console.error('Failed to modify podcast:', error);
-      throw error;
-    }
-  },
+  
+      // Return mock data only in development mode
+      if (process.env.NODE_ENV === 'development') {
         console.warn('Using mock data in development mode');
         return {
           data: {
@@ -733,7 +728,19 @@ export const api = {
           }
         };
       }
-
+  
+      throw error; // Rethrow the error in production
+    }
+  },
+  
+  async getStudioData() {
+    try {
+      if (!validateApiConfig()) {
+        if (process.env.NODE_ENV !== 'development') {
+          throw new Error('Invalid API configuration');
+        }
+      }
+  
       // Check network connectivity
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         console.warn('No internet connection - Using offline mode');
@@ -745,14 +752,14 @@ export const api = {
           }
         };
       }
-
+  
       // Add timeout to fetch request
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
         console.warn('Request timed out - Using offline mode');
       }, 10000); // 10 second timeout
-
+  
       const response = await fetch(`${API_URL}/studio/data`, {
         method: 'GET',
         headers: {
@@ -762,9 +769,9 @@ export const api = {
         },
         signal: controller.signal
       });
-
+  
       clearTimeout(timeoutId);
-
+  
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error Response:', {
@@ -774,9 +781,9 @@ export const api = {
         });
         throw new Error(`API Error: ${response.status} - ${errorText}`);
       }
-
+  
       const data = await response.json();
-
+  
       // Enhanced response validation
       if (!data || typeof data !== 'object' || !('contents' in data)) {
         console.warn('Invalid response structure - Using default values');
@@ -788,7 +795,7 @@ export const api = {
           }
         };
       }
-
+  
       return {
         data: {
           contents: data?.contents || [],
@@ -805,12 +812,12 @@ export const api = {
         timestamp: new Date().toISOString(),
         offline: !navigator.onLine
       };
-
+  
       console.error('Studio data fetch error:', {
         ...errorDetails,
         stack: error instanceof Error ? error.stack : undefined
       });
-
+  
       // Return offline data for specific error types
       if (
         error instanceof TypeError || // Network errors
@@ -826,11 +833,11 @@ export const api = {
           }
         };
       }
-
+  
       throw error;
     }
   }
-};
+  
 
 // Mock response generator for offline mode
 function mockResponse(request: ProcessRequest): ProcessResponse {

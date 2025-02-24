@@ -1,5 +1,13 @@
 import { ProcessRequest } from "../api";
-import { ContentStatus, handleApiError, handleApiResponse, ModifyPodcastRequest, ModifyPodcastResponse, ProcessResponse, validateApiConfig } from "./types";
+import {
+  ContentStatus,
+  handleApiError,
+  handleApiResponse,
+  ModifyPodcastRequest,
+  ModifyPodcastResponse,
+  ProcessResponse,
+  validateApiConfig,
+} from "./types";
 
 // API Configuration
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -98,7 +106,7 @@ export const autoContentApi = {
       const payload = {
         resources: resources.map((r) => ({
           content: r,
-          type:  "website",
+          type: "website",
         })),
         text,
         includeCitations: options.includeCitations ?? false,
@@ -137,7 +145,7 @@ export const autoContentApi = {
         }
         throw new Error("Content generation failed or timed out");
       }
-      console.log("Content generation",data);
+      console.log("Content generation", data);
       return data;
     } catch (error) {
       console.error("Deep dive generation error:", {
@@ -149,11 +157,11 @@ export const autoContentApi = {
     }
   },
 
-  async modifyPodcast(
-    request: ModifyPodcastRequest
-  ): Promise<ModifyPodcastResponse> {
+  async modifyPodcast(request: ModifyPodcastRequest): Promise<ModifyPodcastResponse> {
     try {
-      const response = await fetch(`${API_URL}/content/ModifyPodcast`, {
+      console.log("Sending modifyPodcast request:", request);
+  
+      const response = await fetch(`api/modifypodcast`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${API_KEY}`,
@@ -162,18 +170,34 @@ export const autoContentApi = {
         },
         body: JSON.stringify(request),
       });
-
+  
+      console.log("Received response:", response);
+  
       if (!response.ok) {
         const errorData = await response.text();
+        console.error("Error response data:", errorData);
         throw new Error(`Failed to modify podcast: ${errorData}`);
       }
-
-      return response.json();
+  
+      const data = await response.json();
+      console.log("Parsed response data:", data);
+  
+      // If the response contains a request_id, start polling
+      if (data.request_id) {
+        console.log("Starting polling for request_id:", data.request_id);
+        return await this.pollStatus(data.request_id);
+      }
+  
+      return data;
     } catch (error) {
-      console.error("Podcast modification error:", error);
+      console.error("Podcast modification error:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : null,
+      });
       throw error;
     }
   },
+  
 
   async cloneVoice(audioFile: File, name: string): Promise<Voice> {
     try {
@@ -181,27 +205,34 @@ export const autoContentApi = {
         console.log("API key is missing");
         throw new Error("API key is missing");
       }
-  
-      console.log("Received file:", audioFile.name, "Size:", audioFile.size, "Type:", audioFile.type);
-  
+
+      console.log(
+        "Received file:",
+        audioFile.name,
+        "Size:",
+        audioFile.size,
+        "Type:",
+        audioFile.type
+      );
+
       // Validate file size (max 10MB)
       if (audioFile.size > 10 * 1024 * 1024) {
         console.log("Audio file too large:", audioFile.size);
         throw new Error("Audio file must be under 10MB");
       }
-  
+
       // Validate file type
       if (!audioFile.type.startsWith("audio/")) {
         console.log("Invalid file type:", audioFile.type);
         throw new Error("Invalid file type. Must be an audio file.");
       }
-  
+
       const formData = new FormData();
       formData.append("audio", audioFile);
       formData.append("name", name);
-  
+
       console.log("Sending POST request to /api/clonevoice with name:", name);
-      
+
       const response = await fetch(`/api/clonevoice`, {
         method: "POST",
         headers: {
@@ -212,16 +243,16 @@ export const autoContentApi = {
       });
       console.log("REsponse", response);
       console.log("Response status:", response.status);
-  
+
       if (!response.ok) {
         const errorData = await response.text();
         console.log("Error data from server:", errorData);
         throw new Error(`Voice cloning failed: ${errorData}`);
       }
-  
+
       const result = await response.json();
       console.log("Received result:", result);
-  
+
       // Poll for completion if needed
       if (result.request_id) {
         console.log("Polling status for request_id:", result.request_id);
@@ -231,7 +262,7 @@ export const autoContentApi = {
           throw new Error(cloneStatus.error || "Voice cloning failed");
         }
       }
-  
+
       // Return formatted voice object
       const voiceObject = {
         id: result.voice_id || result.voiceId,
@@ -249,7 +280,7 @@ export const autoContentApi = {
           emotion_intensities: ["low", "medium", "high"],
         },
       };
-  
+
       console.log("Voice cloning successful:", voiceObject);
       return voiceObject;
     } catch (error) {
@@ -263,7 +294,6 @@ export const autoContentApi = {
       throw error;
     }
   },
-  
 
   async getAvailableVoices(): Promise<Voice[]> {
     try {
@@ -300,9 +330,9 @@ export const autoContentApi = {
 
             console.log("Fetching voices from API...");
 
-            const response = await fetch('/api/voices', {
-              signal: AbortSignal.timeout(10000)
-          });
+            const response = await fetch("/api/voices", {
+              signal: AbortSignal.timeout(10000),
+            });
 
             console.log(`Response Status: ${response.status}`);
 
@@ -317,40 +347,77 @@ export const autoContentApi = {
             const voices = await response.json();
             console.log("API Response Data:", voices);
 
-            // Handle both array and { data: [] } response formats
+            // Ensure voice data format is correct
             const voiceData = Array.isArray(voices) ? voices : voices?.data;
 
             if (!Array.isArray(voiceData)) {
               throw new Error("Invalid voice data format");
             }
 
-            console.log(`Total voices received: ${voiceData.length}`);
+            // console.log(`Total voices received: ${voiceData.length}`);
 
-            // Filter to only English voices and format them
+            // // Log the raw response data
+            // console.log("Raw Voices Data:", JSON.stringify(voiceData, null, 2));
+
+            // Process voices
             const englishVoices = voiceData
-            .map((voice) => ({
-              id: voice.id.toString(),
-              name: voice.name,
-              language: 'en-US', // Since these are English voices
-              gender: voice.gender === 'f' ? 'female' : 'male',
-              isCloned: false, // Default value if not provided
-              accent: 'neutral', // Default value if not provided
-              preview_url: voice.sampleUrl || null,
-              style: 'neutral', // Default value if not provided
-              age: 'adult', // Default value if not provided
-              emotion: 'neutral', // Default value if not provided
-              speed_range: { min: 0.8, max: 1.2 }, // Default value if not provided
-              pitch_range: { min: 0.8, max: 1.2 }, // Default value if not provided
-              emphasis_levels: ['light', 'moderate', 'strong'], // Default value if not provided
-              emotion_intensities: ['low', 'medium', 'high'] // Default value if not provided
-            }))
-            .filter(voice => voice.name && voice.id); // Basic validation
-          
-          console.log(`Filtered voices: ${englishVoices.length}`);
-          
-          if (englishVoices.length === 0) {
+              .map((voice) => {
+                const formattedVoice = {
+                  id: voice.id.toString(),
+                  name: voice.name,
+                  language: "en-US", // English only
+                  gender:
+                    voice.gender.toLowerCase() === "f" ? "Female" : "Male",
+                  isCloned: false, // Default value
+                  accent: "neutral", // Default value
+                  preview_url: voice.sampleUrl || null, // Check if sampleUrl exists
+                  style: "neutral", // Default value
+                  age: "adult", // Default value
+                  emotion: "neutral", // Default value
+                  speed_range: { min: 0.8, max: 1.2 }, // Default value
+                  pitch_range: { min: 0.8, max: 1.2 }, // Default value
+                  emphasis_levels: ["light", "moderate", "strong"], // Default value
+                  emotion_intensities: ["low", "medium", "high"], // Default value
+                };
+
+                // Log individual voice to check if preview_url is present
+                // console.log(
+                //   `Processed Voice - Name: ${formattedVoice.name}, Preview URL: ${formattedVoice.preview_url}`
+                // );
+
+                return formattedVoice;
+              })
+              .filter((voice) => {
+                if (!voice.name || !voice.id) {
+                  console.warn(
+                    `Skipping invalid voice: ${JSON.stringify(voice)}`
+                  );
+                  return false;
+                }
+                return true;
+              });
+
+            // Log final filtered list
+            // console.log(
+            //   "Final Filtered Voices:",
+            //   JSON.stringify(englishVoices, null, 2)
+            // );
+
+            // Check if any voices are missing preview URLs
+            const voicesWithoutPreview = englishVoices.filter(
+              (voice) => !voice.preview_url
+            );
+            if (voicesWithoutPreview.length > 0) {
+              console.warn(
+                "Some voices are missing preview URLs:",
+                JSON.stringify(voicesWithoutPreview, null, 2)
+              );
+            }
+
+            // Return the processed voices
+            if (englishVoices.length === 0) {
               throw new Error("No valid voices found");
-          }
+            }
 
             console.log("Returning valid English voices");
             return englishVoices;
@@ -465,6 +532,8 @@ export const autoContentApi = {
     }));
     return defaultVoices;
   },
+
+  
 
   async pollStatus(requestId: string, maxAttempts = 30, interval = 2000) {
     let attempts = 0;
@@ -628,42 +697,41 @@ export const autoContentApi = {
         if (OFFLINE_MODE) {
           return mockResponse(request);
         }
-        throw new Error('API configuration is invalid');
+        throw new Error("API configuration is invalid");
       }
 
       const response = await fetch(`/api/content`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'SmartNotebook/1.0'
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          "User-Agent": "SmartNotebook/1.0",
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
       });
 
-      return handleApiResponse(response, 'createContent');
+      return handleApiResponse(response, "createContent");
     } catch (error) {
-      return handleApiError(error, 'createContent');
+      return handleApiError(error, "createContent");
     }
   },
-  
+
   async getContentStatus(id: string): Promise<ContentStatus> {
     try {
       if (!validateApiConfig()) {
-        throw new Error('Invalid API configuration');
+        throw new Error("Invalid API configuration");
       }
 
       const response = await fetch(`${API_URL}${ENDPOINTS.status}/${id}`, {
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+        },
       });
 
-      return handleApiResponse(response, 'getContentStatus');
+      return handleApiResponse(response, "getContentStatus");
     } catch (error) {
-      return handleApiError(error, 'getContentStatus');
+      return handleApiError(error, "getContentStatus");
     }
   },
-
 };
