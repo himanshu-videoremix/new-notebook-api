@@ -60,8 +60,8 @@ export function NotebookInterface() {
   const [selectedContentType, setSelectedContentType] = useState('');
   const [sources, setSources] = useState<any[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
-  // const [audioUrl, setAudioUrl] = useState<string>();
-  const [audioUrl, setAudioUrl] = useState(staticAudioUrl);
+  const [audioUrl, setAudioUrl] = useState<string>();
+  // const [audioUrl, setAudioUrl] = useState(staticAudioUrl);
 
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
