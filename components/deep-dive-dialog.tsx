@@ -391,44 +391,37 @@ export function DeepDiveDialog({
                             <SelectValue placeholder="Select voice" />
                           </SelectTrigger>
                           <SelectContent>
-                            {voices.map((voice) => {
-                              return (
+                            {voices.map((voice) => (
+                              <div key={voice.id} className="relative cursor-pointer">
                                 <SelectItem
-                                  key={voice.id}
                                   value={voice.id}
-                                  disabled={voice.id === selectedVoices.voice2}
+                                  disabled={voice.id === selectedVoices.voice2 /* or voice1 for the other dropdown */}
                                 >
-                                  <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center justify-between w-full pr-7">
                                     <span>
                                       {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
                                     </span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className={`ml-2 ${!voice.preview_url ? "opacity-50 cursor-not-allowed" : ""}`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (voice.preview_url) {
-                                          try {
-                                            playVoicePreview(voice.preview_url);
-                                          } catch (error) {
-                                            toast({
-                                              title: "Preview failed",
-                                              description: "Could not play voice preview",
-                                              variant: "destructive",
-                                            });
-                                          }
-                                        }
-                                      }}
-                                      // disabled={!voice.preview_url}
-                                    >
-                                      <PlayCircle className="h-4 w-4" />
-                                    </Button>
                                   </div>
                                 </SelectItem>
-                              );
-                            })}
 
+                                {/* Position the play button as an absolutely positioned element */}
+                                {voice.preview_url && (
+                                  <div
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+
+                                      // Play the preview without closing the dropdown
+                                      setTimeout(() => {
+                                        playVoicePreview(voice.preview_url);
+                                      }, 0);
+                                    }}
+                                  >
+                                    <PlayCircle className="h-4 w-4" />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </SelectContent>
                         </Select>
                         <Button
@@ -497,44 +490,37 @@ export function DeepDiveDialog({
                           <SelectValue placeholder="Select voice" />
                         </SelectTrigger>
                         <SelectContent>
-                          {voices.map((voice) => {
-                            return (
+                          {voices.map((voice) => (
+                            <div key={voice.id} className="relative cursor-pointer">
                               <SelectItem
-                                key={voice.id}
                                 value={voice.id}
-                                disabled={voice.id === selectedVoices.voice2}
+                                disabled={voice.id === selectedVoices.voice2 /* or voice1 for the other dropdown */}
                               >
-                                <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center justify-between w-full pr-7">
                                   <span>
                                     {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
                                   </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={`ml-2 ${!voice.preview_url ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (voice.preview_url) {
-                                        try {
-                                          playVoicePreview(voice.preview_url);
-                                        } catch (error) {
-                                          toast({
-                                            title: "Preview failed",
-                                            description: "Could not play voice preview",
-                                            variant: "destructive",
-                                          });
-                                        }
-                                      }
-                                    }}
-                                    disabled={!voice.preview_url}
-                                  >
-                                    <PlayCircle className="h-4 w-4" />
-                                  </Button>
                                 </div>
                               </SelectItem>
-                            );
-                          })}
 
+                              {/* Position the play button as an absolutely positioned element */}
+                              {voice.preview_url && (
+                                <div
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+
+                                    // Play the preview without closing the dropdown
+                                    setTimeout(() => {
+                                      playVoicePreview(voice.preview_url);
+                                    }, 0);
+                                  }}
+                                >
+                                  <PlayCircle className="h-4 w-4" />
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
