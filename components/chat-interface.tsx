@@ -177,8 +177,8 @@ export function ChatInterface({
         {/* Generated Summary Block */}
         {generatedSummary ? (
           <div className="flex justify-start canvas-slide-in">
-            <div className="max-w-[80%] rounded-lg p-3 text-primary-foreground shadow-lg shadow-primary/20 ml-[40px]">
-              <div className="text-white text-[16px] leading-[18px] whitespace-pre-wrap ">
+            <div className="max-w-[85%] bg-[#2B2D31] border border-[#3B3D41] rounded-lg overflow-hidden">
+              <div className="text-white text-[16px] leading-[18px] whitespace-pre-wrap p-4">
                 {generatedSummary.summary}
               </div>
             </div>

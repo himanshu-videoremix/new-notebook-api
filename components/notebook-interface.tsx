@@ -75,7 +75,7 @@ export function NotebookInterface() {
   const [generatedSummary, setgeneratedSummary] = useState<{
   } | null>(null);
   const [modifiedAudioUrl, setModifiedAudioUrl] = useState<string | null>(null);
-  
+
   const { data, createContent, status, error } = useApiFeatures();
   const [messages, setMessages] = useState([]);
   const { voices, isLoading: voicesLoading, handleVoiceCreated, playVoicePreview } = useVoices();
@@ -322,7 +322,6 @@ export function NotebookInterface() {
         console.error("Audio URL is missing. Full response:", result);
         throw new Error("No audio URL returned");
       }
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to generate audio overview';
       console.error('Failed to generate audio:', errorMessage);
@@ -336,6 +335,7 @@ export function NotebookInterface() {
       setIsGeneratingAudio(false);
     }
   };
+
 
   const handleGenerateContent = async (type: string) => {
     if (type === 'study_guide') {
@@ -368,7 +368,7 @@ export function NotebookInterface() {
       const request: ProcessRequest = {
         resources: selectedSourceContents.map(content => ({
           content,
-          type: 'text'
+          type: 'website'
         })),
         text: `Generate ${options.type} content`,
         outputType: options.type,
@@ -437,6 +437,7 @@ export function NotebookInterface() {
         };
         setNotes((prevNotes) => [note, ...prevNotes]);
         break;
+
       default:
         console.warn('Unhandled content type:', type);
     }
@@ -454,10 +455,10 @@ export function NotebookInterface() {
   return (
     <div className="min-h-screen bg-[#1A1B1E] text-white">
       <Walkthrough />
-      <div className="flex h-screen">
+      <div className="flex h-screen w-full">
         {/* Sources Sidebar */}
         <div
-          className="w-[400px] h-full pt-14 bg-[#1A1B1E] border-r border-[#2B2D31] flex flex-col"
+          className="w-1/3 h-full pt-14 bg-[#1A1B1E] border-r border-[#2B2D31] flex flex-col"
           data-walkthrough="sources"
         >
           <div className="flex items-center justify-between p-4">
@@ -547,7 +548,7 @@ export function NotebookInterface() {
 
         {/* Main Content */}
         <div
-          className="w-[500px] pt-14 flex flex-col"
+          className="w-1/3 pt-14 flex flex-col border-r border-[#2B2D31]"
           data-walkthrough="chat"
         >
           <Suspense fallback={<div className="flex-1 flex items-center justify-center">
@@ -565,7 +566,7 @@ export function NotebookInterface() {
 
         {/* Studio Sidebar */}
         <div
-          className="w-[400px] h-full pt-14 bg-[#1A1B1E] border-l border-[#2B2D31]"
+          className="w-1/3 h-full pt-14 bg-[#1A1B1E]"
           data-walkthrough="studio"
         >
           <div className="p-4">
@@ -887,23 +888,8 @@ export function NotebookInterface() {
                     <MessageSquare className="h-3 w-3 mr-2" />
                     Outline
                   </Button>
+                  
                 </div>
-
-                {/* Display generated content */}
-                <div className="generated-content mt-4">
-                  {notes.length > 0 ? (
-                    notes.map((note) => (
-                      <div key={note.id} className="p-4 mb-2 border rounded bg-gray-800">
-                        <h2 className="text-lg font-semibold">{note.title}</h2>
-                        <p className="mt-2 text-sm">{note.content}</p>
-                        <small className="text-gray-500">{new Date(note.timestamp).toLocaleString()}</small>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-400">No generated content yet.</p>
-                  )}
-                </div>
-
 
                 <div className="flex flex-col items-center justify-center h-48 text-gray-500 mt-8">
                   <Book className="h-6 w-6 mb-2" />
@@ -959,7 +945,7 @@ export function NotebookInterface() {
               const request = {
                 resources: selectedSourceContents.map(content => ({
                   content,
-                  type: 'text'
+                  type: 'website'
                 })),
                 text: 'Generate briefing document',
                 outputType: 'briefing_doc',
@@ -1021,7 +1007,7 @@ export function NotebookInterface() {
               const request = {
                 resources: selectedSourceContents.map(content => ({
                   content,
-                  type: 'text'
+                  type: 'website'
                 })),
                 text: 'Generate study guide',
                 outputType: 'study_guide',
