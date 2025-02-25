@@ -368,7 +368,7 @@ export function NotebookInterface() {
       const request: ProcessRequest = {
         resources: selectedSourceContents.map(content => ({
           content,
-          type: 'website'
+          type: 'text'
         })),
         text: `Generate ${options.type} content`,
         outputType: options.type,
@@ -888,7 +888,7 @@ export function NotebookInterface() {
                     <MessageSquare className="h-3 w-3 mr-2" />
                     Outline
                   </Button>
-                  
+                 
                 </div>
 
                 <div className="flex flex-col items-center justify-center h-48 text-gray-500 mt-8">
