@@ -17,7 +17,8 @@ import {
   CheckSquare,
   Loader2,
   Edit,
-  PlayCircle
+  PlayCircle,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +49,56 @@ import { useVoices } from '@/hooks/use-voices';
 
 export function NotebookInterface() {
   const staticAudioUrl = "https://autocontentapi.blob.core.windows.net/audios/67fa9f5b-3d38-4382-abf8-13f7d103d817_20250224092847.wav";
-
+  const staticGithubContent = {
+    faq: {
+      what_is_github: "GitHub is an AI-powered developer platform where you can build and ship software. It's a collaborative platform that offers tools for coding, security, automation, and project management.",
+      key_features: [
+        {
+          name: "GitHub Copilot",
+          description: "AI-powered coding assistance that helps you write code faster and more securely. It offers code completion, chat functionality, and can be integrated throughout your workflows."
+        },
+        {
+          name: "GitHub Actions",
+          description: "Allows you to automate any workflow. Optimize your processes with simple and secure CI/CD."
+        },
+        {
+          name: "GitHub Codespaces",
+          description: "Provides comprehensive dev environments in the cloud so you can start building instantly."
+        },
+        {
+          name: "GitHub Mobile",
+          description: "Allows you to manage projects and chat with GitHub Copilot from anywhere."
+        },
+        {
+          name: "GitHub Issues",
+          description: "Helps you to create issues and manage projects with tools that adapt to your code."
+        },
+        {
+          name: "GitHub Discussions",
+          description: "Provides a space for open-ended conversations alongside your projects."
+        },
+        {
+          name: "Code Review",
+          description: "Create review processes that improve code quality and fit neatly into your workflow."
+        },
+        {
+          name: "GitHub Advanced Security",
+          description: "Helps you to find and fix vulnerabilities with AI, so you can ship more secure software faster."
+        }
+      ],
+      benefits: [
+        "Increased productivity: GitHub Copilot can help you work 55% faster.",
+        "Improved security: GitHub Advanced Security helps you find and fix vulnerabilities quickly. Resolve vulnerabilities 7x faster.",
+        "Streamlined workflows: Automate tasks and improve the developer experience with GitHub Copilot.",
+        "Better collaboration: Collaborate with your team on a single, integrated platform.",
+        "Scalability: GitHub scales with teams of any size in any industry."
+      ],
+      application_security: "GitHub provides built-in application security features that allow you to find and fix vulnerabilities. GitHub Advanced Security uses AI to help you apply fixes quickly. Also, GitHub helps you detect, prevent, and remediate leaked secrets across your organization.",
+      open_source: "You can become an open source partner through GitHub Sponsors to support the tools and libraries that power your work.",
+      enterprise_suitability: "Yes, GitHub offers enterprise-grade security features, AI features, and 24/7 support. It is used by companies of all sizes, from startups to enterprises."
+    },
+    response_text: "Here is some FAQ-style content based on the provided source:\nWhat is GitHub?\nGitHub is an AI-powered developer platform where you can build and ship software. It's a collaborative platform that offers tools for coding, security, automation, and project management.[1][2][3][4][5]\nWhat are some key features of GitHub?\n•GitHub Copilot: AI-powered coding assistance that helps you write code faster and more securely. It offers code completion, chat functionality, and can be integrated throughout your workflows.[1][4][4][6]\n•GitHub Actions: Allows you to automate any workflow. Optimize your processes with simple and secure CI/CD.[3][6]\n•GitHub Codespaces: Provides comprehensive dev environments in the cloud so you can start building instantly.[3][7]\n•GitHub Mobile: Allows you to manage projects and chat with GitHub Copilot from anywhere.[8]\n•GitHub Issues: Helps you to create issues and manage projects with tools that adapt to your code.[9]\n•GitHub Discussions: Provides a space for open-ended conversations alongside your projects.[9]\n•Code Review: Create review processes that improve code quality and fit neatly into your workflow.[10]\n•GitHub Advanced Security: Helps you to find and fix vulnerabilities with AI, so you can ship more secure software faster.[11]\nWhat are the benefits of using GitHub?\n•Increased productivity: GitHub Copilot can help you work 55% faster.[6]\n•Improved security: GitHub Advanced Security helps you find and fix vulnerabilities quickly. Resolve vulnerabilities 7x faster.[4][11][5]\n•Streamlined workflows: Automate tasks and improve the developer experience with GitHub Copilot.[4]\n•Better collaboration: Collaborate with your team on a single, integrated platform.[5]\n•Scalability: GitHub scales with teams of any size in any industry.[10]\nHow can GitHub help with application security?\nGitHub provides built-in application security features that allow you to find and fix vulnerabilities. GitHub Advanced Security uses AI to help you apply fixes quickly. Also, GitHub helps you detect, prevent, and remediate leaked secrets across your organization.[8][11][11]\nHow does GitHub support open source?\nYou can become an open source partner through GitHub Sponsors to support the tools and libraries that power your work.[10]\nIs GitHub suitable for enterprises?\nYes, GitHub offers enterprise-grade security features, AI features, and 24/7 support. It is used by companies of all sizes, from startups to enterprises.[12][10]\n"
+  };
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
   const [showDeepDiveDialog, setShowDeepDiveDialog] = useState(false);
@@ -62,7 +112,8 @@ export function NotebookInterface() {
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [audioUrl, setAudioUrl] = useState<string>();
   // const [audioUrl, setAudioUrl] = useState(staticAudioUrl);
-
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -75,7 +126,7 @@ export function NotebookInterface() {
   const [generatedSummary, setgeneratedSummary] = useState<{
   } | null>(null);
   const [modifiedAudioUrl, setModifiedAudioUrl] = useState<string | null>(null);
-
+  const [previewContent, setPreviewContent] = useState(null);
   const { data, createContent, status, error } = useApiFeatures();
   const [messages, setMessages] = useState([]);
   const { voices, isLoading: voicesLoading, handleVoiceCreated, playVoicePreview } = useVoices();
@@ -99,6 +150,22 @@ export function NotebookInterface() {
   if (!isInitialized) {
     return null;
   }
+
+  const truncateText = (text, maxLines = 3) => {
+    if (!text) return '';
+
+    // Split by newlines and take only the first few lines
+    const lines = text.split('\n').slice(0, maxLines);
+
+    // Join them back together
+    return lines.join('\n') + (text.split('\n').length > maxLines ? '...' : '');
+  };
+
+  const toggleExpandedView = () => {
+    setIsPreviewExpanded(!isPreviewExpanded);
+    setIsSidebarVisible(!isPreviewExpanded);
+  };
+
   const handleUploadComplete = (resource: any) => {
     const newSource = {
       ...resource,
@@ -338,6 +405,7 @@ export function NotebookInterface() {
 
 
   const handleGenerateContent = async (type: string) => {
+    console.log("call setShowStudyGuideDialog setShowStudyGuideDialog")
     if (type === 'study_guide') {
       setShowStudyGuideDialog(true);
     } else if (type === 'briefing_doc') {
@@ -358,6 +426,8 @@ export function NotebookInterface() {
     citations: boolean;
   }) => {
     try {
+      console.log("Generating content with options:", options);
+
       setIsGenerating(true);
       setGenerationProgress(0);
 
@@ -365,30 +435,45 @@ export function NotebookInterface() {
         .filter(s => selectedSources.includes(s.id))
         .map(s => s.content);
 
+      console.log("Selected sources:", selectedSourceContents);
+
       const request: ProcessRequest = {
         resources: selectedSourceContents.map(content => ({
           content,
-          type: 'text'
+          type: options.type === 'deep_dive'
+            ? (options.format === 'audio' ? 'audio' : 'text')  // If format is 'audio', use 'audio', else 'text'
+            : 'website'  // Default to 'website'
         })),
         text: `Generate ${options.type} content`,
         outputType: options.type,
         includeCitations: options.citations,
         customization: {
-          format: options.format,
-          tone: options.tone,
-          length: options.length,
-          complexity: options.complexity,
-          audience: options.audience
+          format: options?.customization?.format,
+          tone: options?.customization?.tone,
+          length: options?.customization?.length,
+          complexity: options?.customization?.complexity,
+          audience: options?.customization?.audience
         }
+
       };
 
+      console.log("Request payload:", request);
+
       const response = await autoContentApi.createContent(request);
+      console.log("API response:", response);
+
+      if (response.status === 'success') {
+        console.log("Content request ID:", response.request_id);
+        handleGeneratedContent(options.type, response?.finalResult?.response_text)
+        setShowGenerationDialog(false);
+      }
 
       if (response.request_id) {
-        // Poll for status and update progress
         let result;
         do {
           result = await autoContentApi.getContentStatus(response.request_id);
+          console.log("Polling status:", result);
+
           if (result.progress) {
             setGenerationProgress(result.progress);
           }
@@ -398,7 +483,9 @@ export function NotebookInterface() {
           await new Promise(resolve => setTimeout(resolve, 1000));
         } while (result.status === 'processing');
 
-        if (result.status === 'completed' && result.content) {
+        if (result.status === 'completed' && result?.content) {
+          console.log(result, "completed Result");
+          console.log("Generated content:", result?.content);
           toast({
             title: "Content generated",
             description: `${options.type} content has been generated successfully`
@@ -419,7 +506,14 @@ export function NotebookInterface() {
     }
   };
 
+
+
   const handleGeneratedContent = (type: string, content: string) => {
+    console.log("Generated Content Type:", type);
+    console.log("Generated Content:", content);
+
+    setPreviewContent(content);
+
     switch (type) {
       case 'study_guide':
       case 'briefing_doc':
@@ -427,6 +521,8 @@ export function NotebookInterface() {
       case 'timeline':
       case 'outline':
       case 'flashcards':
+        console.log(`Adding ${type} content to notes...`);
+
         // Add to notes section
         const note = {
           id: Date.now().toString(),
@@ -435,6 +531,9 @@ export function NotebookInterface() {
           type,
           timestamp: new Date().toISOString()
         };
+
+        console.log("New Note:", note);
+
         setNotes((prevNotes) => [note, ...prevNotes]);
         break;
 
@@ -442,6 +541,7 @@ export function NotebookInterface() {
         console.warn('Unhandled content type:', type);
     }
   };
+
 
   const handleCustomize = (type: string) => {
     setSelectedContentType(type);
@@ -565,346 +665,406 @@ export function NotebookInterface() {
         </div>
 
         {/* Studio Sidebar */}
-        <div
-          className="w-1/3 h-full pt-14 bg-[#1A1B1E]"
-          data-walkthrough="studio"
-        >
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-medium text-white">Studio</h2>
-              </div>
+        {isPreviewExpanded ? (
+          // Show only the expanded preview
+          <div
+            className="w-1/3 h-full p-[18px] pt-14 bg-[#1A1B1E]"
+            onClick={toggleExpandedView}
+          >
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-[20px] font-semibold tracking-wide">Preview</h3>
               <Button
                 variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white hover:bg-[#2B2D31]"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpandedView();
+                }}
+                className="text-gray-400 hover:text-white"
               >
-                <List className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </Button>
             </div>
+            <div
+              className="text-[15px] leading-relaxed whitespace-pre-wrap"
+              onClick={(e) => e.stopPropagation()} // Stops event from bubbling up
+            >
+              {previewContent.replace(/\[\d+\]/g, "")}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="w-1/3 h-full pt-14 bg-[#1A1B1E]"
+            data-walkthrough="studio"
+          >
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-white">Audio Overview</h3>
-                <TooltipProvider delayDuration={0}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 text-gray-400 hover:text-white hover:bg-[#2B2D31] transition-colors"
-                      >
-                        <HelpCircle className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="right"
-                      align="start"
-                      className="max-w-sm p-4 bg-[#2B2D31] border-[#3B3D41] shadow-xl rounded-lg"
-                    >
-                      <p className="text-sm text-gray-300 leading-relaxed">
-                        Audio Overviews are lively "deep dive" discussions that summarize the key topics in your sources. This is an experimental feature and below are some notes to help you get started:
-                      </p>
-                      <ul className="mt-3 space-y-2 text-sm text-gray-300">
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-400">•</span>
-                          <span>Audio Overviews (including the voices) are AI-generated, so there might be inaccuracies and audio glitches.</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-400">•</span>
-                          <span>Audio Overviews are not a comprehensive or objective view of a topic, but simply a reflection of your sources.</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-blue-400">•</span>
-                          <span>Audio Overviews are only in English at this moment.</span>
-                        </li>
-                      </ul>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              <div className="bg-[#2B2D31] rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2" data-walkthrough="deep-dive">
-                  <MessageSquare className="h-4 w-4 text-blue-500" />
-                  <h3 className="text-sm font-medium text-white">Deep Dive conversation</h3>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-medium text-white">Studio</h2>
                 </div>
-                <p className="text-xs text-gray-400 mb-3">Two hosts (English only)</p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    disabled={selectedSources.length === 0}
-                    onClick={() => handleCustomize('deep_dive')}
-                  >
-                    Customize
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    disabled={selectedSources.length === 0 || isGeneratingAudio || showAudioDialog}
-                    onClick={() => handleGenerateAudio({ voice1: 'en-US-1', voice2: 'en-US-2' })}
-                  >
-                    {isGeneratingAudio ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Generating...</span>
-                      </div>
-                    ) : (
-                      'Generate'
-                    )}
-                  </Button>
-                </div>
-
-                {audioUrl && (
-                  <div className="mt-4">
-                    <h4 className="text-white text-sm font-medium mb-2">Generated Audio</h4>
-                    <audio controls src={audioUrl} className="w-full">
-                      Your browser does not support the audio element.
-                    </audio>
-
-
-                    <div className="space-y-4">
-                      {/* Modification Instructions */}
-                      <div className="grid gap-2">
-                        <Label>Modification Instructions</Label>
-                        <textarea
-                          className="w-full p-2 bg-[#3B3D41] text-white rounded-lg mb-2 text-sm mt-[10px]"
-                          placeholder="Enter modification instructions..."
-                          value={modificationInstructions}
-                          onChange={(e) => setModificationInstructions(e.target.value)}
-                        />
-                      </div>
-
-                      {/* Speaker 1 Voice Selection */}
-                      <div className="grid gap-2">
-                        {/* <Label>First Speaker Voice</Label>
-                         */}
-                        <span>Select Voice 1</span>
-                        <Select
-                          value={selectedVoices.voice1}
-                          onValueChange={(v) =>
-                            setSelectedVoices((prev) => ({ ...prev, voice1: v }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select voice" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {voices.map((voice) => (
-                              <SelectItem
-                                key={voice.id}
-                                value={voice.id}
-                                disabled={voice.id === selectedVoices.voice2}
-                              >
-                                <div className="flex items-center justify-between w-full">
-                                  <span>
-                                    {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={`ml-2 ${!voice.preview_url ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (voice.preview_url) {
-                                        try {
-                                          playVoicePreview(voice.preview_url);
-                                        } catch (error) {
-                                          toast({
-                                            title: "Preview failed",
-                                            description: "Could not play voice preview",
-                                            variant: "destructive",
-                                          });
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    <PlayCircle className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Speaker 2 Voice Selection */}
-                      <div className="grid gap-2">
-                        {/* <Label>Second Speaker Voice</Label> */}
-                        <span>Select Voice 2</span>
-
-                        <Select
-                          value={selectedVoices.voice2}
-                          onValueChange={(v) =>
-                            setSelectedVoices((prev) => ({ ...prev, voice2: v }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select voice" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {voices.map((voice) => (
-                              <SelectItem
-                                key={voice.id}
-                                value={voice.id}
-                                disabled={voice.id === selectedVoices.voice1}
-                              >
-                                <div className="flex items-center justify-between w-full">
-                                  <span>
-                                    {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={`ml-2 ${!voice.preview_url ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (voice.preview_url) {
-                                        try {
-                                          playVoicePreview(voice.preview_url);
-                                        } catch (error) {
-                                          toast({
-                                            title: "Preview failed",
-                                            description: "Could not play voice preview",
-                                            variant: "destructive",
-                                          });
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    <PlayCircle className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Modify Podcast Button */}
-                      <Button
-                        variant="outline"
-                        className="w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41]"
-                        disabled={isModifying || !modificationInstructions || !selectedVoices.voice1 || !selectedVoices.voice2}
-                        onClick={() => handleModifyPodcast({
-                          instructions: modificationInstructions,
-                          voice1: selectedVoices.voice1,
-                          voice2: selectedVoices.voice2
-                        })}
-
-                      >
-                        {isModifying ? (
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Modifying...</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Edit className="w-4 h-4" />
-                            <span>Modify Podcast</span>
-                          </div>
-                        )}
-                      </Button>
-                    </div>
-                    {modifiedAudioUrl && (
-                      <div className="mt-4">
-                        <h4 className="text-white text-sm font-medium mb-2">Modified Audio</h4>
-                        <audio controls src={modifiedAudioUrl} className="w-full">
-                          Your browser does not support the audio element.
-                        </audio>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <h3
-                  className="text-xs font-medium text-gray-400"
-                  data-walkthrough="notes"
-                >
-                  Notes
-                </h3>
                 <Button
-                  variant="outline"
-                  className="w-full justify-start text-gray-400 bg-transparent border-[#2B2D31] hover:bg-[#2B2D31]"
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-400 hover:text-white hover:bg-[#2B2D31]"
                 >
-                  + Add note
+                  <List className="h-4 w-4" />
                 </Button>
+              </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
-                    data-walkthrough="study-guide"
-                    onClick={() => handleCustomize('study_guide')}
-                    disabled={selectedSources.length === 0 || isGenerating}
-                  >
-                    <Book className="h-3 w-3 mr-2" />
-                    Study guide
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
-                    data-walkthrough="briefing"
-                    onClick={() => setShowBriefingDialog(true)}
-                    disabled={selectedSources.length === 0 || isGenerating}
-                  >
-                    <MessageSquare className="h-3 w-3 mr-2" />
-                    Briefing doc
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
-                    data-walkthrough="faq"
-                    onClick={() => handleGenerateContent('faq')}
-                    disabled={selectedSources.length === 0 || isGenerating}
-                  >
-                    <MessageSquare className="h-3 w-3 mr-2" />
-                    FAQ
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
-                    data-walkthrough="timeline"
-                    onClick={() => handleGenerateContent('timeline')}
-                    disabled={selectedSources.length === 0 || isGenerating}
-                  >
-                    <MessageSquare className="h-3 w-3 mr-2" />
-                    Timeline
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
-                    data-walkthrough="outline"
-                    onClick={() => handleGenerateContent('outline')}
-                    disabled={selectedSources.length === 0 || isGenerating}
-                  >
-                    <MessageSquare className="h-3 w-3 mr-2" />
-                    Outline
-                  </Button>
-                 
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-white">Audio Overview</h3>
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 text-gray-400 hover:text-white hover:bg-[#2B2D31] transition-colors"
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        align="start"
+                        className="max-w-sm p-4 bg-[#2B2D31] border-[#3B3D41] shadow-xl rounded-lg"
+                      >
+                        <p className="text-sm text-gray-300 leading-relaxed">
+                          Audio Overviews are lively "deep dive" discussions that summarize the key topics in your sources. This is an experimental feature and below are some notes to help you get started:
+                        </p>
+                        <ul className="mt-3 space-y-2 text-sm text-gray-300">
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400">•</span>
+                            <span>Audio Overviews (including the voices) are AI-generated, so there might be inaccuracies and audio glitches.</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400">•</span>
+                            <span>Audio Overviews are not a comprehensive or objective view of a topic, but simply a reflection of your sources.</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400">•</span>
+                            <span>Audio Overviews are only in English at this moment.</span>
+                          </li>
+                        </ul>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
 
-                <div className="flex flex-col items-center justify-center h-48 text-gray-500 mt-8">
-                  <Book className="h-6 w-6 mb-2" />
-                  <p className="text-sm text-center">
-                    Saved notes will appear here
-                  </p>
-                  <p className="text-xs text-center mt-1">
-                    Save a chat message to create a new note, or click Add note above.
-                  </p>
+                <div className="bg-[#2B2D31] rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2" data-walkthrough="deep-dive">
+                    <MessageSquare className="h-4 w-4 text-blue-500" />
+                    <h3 className="text-sm font-medium text-white">Deep Dive conversation</h3>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-3">Two hosts (English only)</p>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      disabled={selectedSources.length === 0}
+                      onClick={() => handleCustomize('deep_dive')}
+                    >
+                      Customize
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className={`w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41] ${selectedSources.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      disabled={selectedSources.length === 0 || isGeneratingAudio || showAudioDialog}
+                      onClick={() => handleGenerateAudio({ voice1: 'en-US-1', voice2: 'en-US-2' })}
+                    >
+                      {isGeneratingAudio ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Generating...</span>
+                        </div>
+                      ) : (
+                        'Generate'
+                      )}
+                    </Button>
+                  </div>
+
+                  {audioUrl && (
+                    <div className="mt-4">
+                      <h4 className="text-white text-sm font-medium mb-2">Generated Audio</h4>
+                      <audio controls src={audioUrl} className="w-full">
+                        Your browser does not support the audio element.
+                      </audio>
+
+
+                      <div className="space-y-4">
+                        {/* Modification Instructions */}
+                        <div className="grid gap-2">
+                          <Label>Modification Instructions</Label>
+                          <textarea
+                            className="w-full p-2 bg-[#3B3D41] text-white rounded-lg mb-2 text-sm mt-[10px]"
+                            placeholder="Enter modification instructions..."
+                            value={modificationInstructions}
+                            onChange={(e) => setModificationInstructions(e.target.value)}
+                          />
+                        </div>
+
+                        {/* Speaker 1 Voice Selection */}
+                        <div className="grid gap-2">
+                          {/* <Label>First Speaker Voice</Label>
+                         */}
+                          <span>Select Voice 1</span>
+                          <Select
+                            value={selectedVoices.voice1}
+                            onValueChange={(v) =>
+                              setSelectedVoices((prev) => ({ ...prev, voice1: v }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select voice" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {voices.map((voice) => (
+                                <div key={voice.id} className="relative cursor-pointer">
+                                  <SelectItem
+                                    value={voice.id}
+                                    disabled={voice.id === selectedVoices.voice2 /* or voice1 for the other dropdown */}
+                                  >
+                                    <div className="flex items-center justify-between w-full pr-7">
+                                      <span>
+                                        {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+
+                                  {/* Position the play button as an absolutely positioned element */}
+                                  {voice.preview_url && (
+                                    <div
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+
+                                        // Play the preview without closing the dropdown
+                                        setTimeout(() => {
+                                          playVoicePreview(voice.preview_url);
+                                        }, 0);
+                                      }}
+                                    >
+                                      <PlayCircle className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Speaker 2 Voice Selection */}
+                        <div className="grid gap-2">
+                          {/* <Label>Second Speaker Voice</Label> */}
+                          <span>Select Voice 2</span>
+
+                          <Select
+                            value={selectedVoices.voice2}
+                            onValueChange={(v) =>
+                              setSelectedVoices((prev) => ({ ...prev, voice2: v }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select voice" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {voices.map((voice) => (
+                                <div key={voice.id} className="relative cursor-pointer">
+                                  <SelectItem
+                                    value={voice.id}
+                                    disabled={voice.id === selectedVoices.voice2 /* or voice1 for the other dropdown */}
+                                  >
+                                    <div className="flex items-center justify-between w-full pr-7">
+                                      <span>
+                                        {voice.name} ({voice.gender?.trim().toLowerCase() === "female" ? "Female" : "Male"})
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+
+                                  {/* Position the play button as an absolutely positioned element */}
+                                  {voice.preview_url && (
+                                    <div
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+
+                                        // Play the preview without closing the dropdown
+                                        setTimeout(() => {
+                                          playVoicePreview(voice.preview_url);
+                                        }, 0);
+                                      }}
+                                    >
+                                      <PlayCircle className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Modify Podcast Button */}
+                        <Button
+                          variant="outline"
+                          className="w-full text-gray-400 bg-transparent border-[#3B3D41] hover:bg-[#3B3D41]"
+                          disabled={isModifying || !modificationInstructions || !selectedVoices.voice1 || !selectedVoices.voice2}
+                          onClick={() => handleModifyPodcast({
+                            instructions: modificationInstructions,
+                            voice1: selectedVoices.voice1,
+                            voice2: selectedVoices.voice2
+                          })}
+
+                        >
+                          {isModifying ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Modifying...</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Edit className="w-4 h-4" />
+                              <span>Modify Podcast</span>
+                            </div>
+                          )}
+                        </Button>
+                      </div>
+                      {modifiedAudioUrl && (
+                        <div className="mt-4">
+                          <h4 className="text-white text-sm font-medium mb-2">Modified Audio</h4>
+                          <audio controls src={modifiedAudioUrl} className="w-full">
+                            Your browser does not support the audio element.
+                          </audio>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3
+                    className="text-xs font-medium text-gray-400"
+                    data-walkthrough="notes"
+                  >
+                    Notes
+                  </h3>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-gray-400 bg-transparent border-[#2B2D31] hover:bg-[#2B2D31]"
+                  >
+                    + Add note
+                  </Button>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
+                      data-walkthrough="study-guide"
+                      onClick={() => handleCustomize('study_guide')}
+                      disabled={selectedSources.length === 0 || isGenerating}
+                    >
+                      <Book className="h-3 w-3 mr-2" />
+                      Study guide
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
+                      data-walkthrough="briefing"
+                      onClick={() => setShowBriefingDialog(true)}
+                      disabled={selectedSources.length === 0 || isGenerating}
+                    >
+                      <MessageSquare className="h-3 w-3 mr-2" />
+                      Briefing doc
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
+                      data-walkthrough="faq"
+                      onClick={() => handleGenerateContent('faq')}
+                      disabled={selectedSources.length === 0 || isGenerating}
+                    >
+                      <MessageSquare className="h-3 w-3 mr-2" />
+                      FAQ
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
+                      data-walkthrough="timeline"
+                      onClick={() => handleGenerateContent('timeline')}
+                      disabled={selectedSources.length === 0 || isGenerating}
+                    >
+                      <MessageSquare className="h-3 w-3 mr-2" />
+                      Timeline
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="justify-start text-gray-400 hover:bg-[#2B2D31] text-xs w-full disabled:opacity-50"
+                      data-walkthrough="outline"
+                      onClick={() => handleGenerateContent('outline')}
+                      disabled={selectedSources.length === 0 || isGenerating}
+                    >
+                      <MessageSquare className="h-3 w-3 mr-2" />
+                      Outline
+                    </Button>
+                  </div>
+                  {previewContent && (
+                    <div
+                      className={`mt-4 p-4 bg-[#1A1B1E] text-white rounded-lg border border-gray-600 shadow-lg ${isPreviewExpanded
+                        ? "fixed inset-0 z-50 overflow-auto m-4 ml-[1411px] !mt-[64px] p-6"
+                        : "max-h-60 overflow-hidden cursor-pointer"
+                        }`}
+                      onClick={toggleExpandedView}
+                    >
+                      <div className="flex justify-between items-center mb-3">
+                        {/* <h3 className="text-[20px] font-semibold tracking-wide">
+                        {finalResult?.outputType || "Preview"}
+                      </h3> */}
+                        {isPreviewExpanded && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpandedView();
+                            }}
+                            className="text-gray-400 hover:text-white"
+                          >
+                            <X className="h-5 w-5" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                        {isPreviewExpanded
+                          ? previewContent.replace(/\[\d+\]/g, "") // Removes numbers like [1], [2], etc.
+                          : truncateText(previewContent.replace(/\[\d+\]/g, ""))
+                        }
+                      </div>
+                    </div>
+                  )}
+
+
+
+                  <div className="flex flex-col items-center justify-center h-48 text-gray-500 mt-8">
+                    <Book className="h-6 w-6 mb-2" />
+                    <p className="text-sm text-center">
+                      Saved notes will appear here
+                    </p>
+                    <p className="text-xs text-center mt-1">
+                      Save a chat message to create a new note, or click Add note above.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
+
+          </div>
+        )}
         <AudioOverviewDialog
           isOpen={showAudioDialog}
           onClose={() => setShowAudioDialog(false)}
@@ -949,7 +1109,7 @@ export function NotebookInterface() {
                 })),
                 text: 'Generate briefing document',
                 outputType: 'briefing_doc',
-                includeCitations: true,
+                includeCitations: false,
                 customization: options
               };
 
@@ -997,12 +1157,15 @@ export function NotebookInterface() {
           onClose={() => setShowStudyGuideDialog(false)}
           onGenerate={async (options) => {
             try {
+              console.log("Study Guide Generation Started...");
               setIsGenerating(true);
               setGenerationProgress(0);
 
               const selectedSourceContents = sources
                 .filter(s => selectedSources.includes(s.id))
                 .map(s => s.content);
+
+              console.log("Selected Sources for Study Guide:", selectedSourceContents);
 
               const request = {
                 resources: selectedSourceContents.map(content => ({
@@ -1011,48 +1174,69 @@ export function NotebookInterface() {
                 })),
                 text: 'Generate study guide',
                 outputType: 'study_guide',
-                includeCitations: true,
-                customization: options
+                includeCitations: false,
+                customization: {
+                  format: options.format,
+                  tone: options.tone,
+                  length: options.length,
+                  complexity: options.complexity,
+                  audience: options.audience
+                }
               };
 
+              console.log("Generated Request Payload:", request);
+
               const response = await autoContentApi.createContent(request);
+              console.log("API Response:", response);
 
               if (response.request_id) {
                 let result;
                 do {
                   result = await autoContentApi.getContentStatus(response.request_id);
+                  console.log("Current Generation Status:", result.status, "| Progress:", result.progress);
+
                   if (result.progress) {
                     setGenerationProgress(result.progress);
                   }
+
                   if (result.status === 'failed') {
                     throw new Error(result.error || 'Study guide generation failed');
                   }
+
                   await new Promise(resolve => setTimeout(resolve, 1000));
                 } while (result.status === 'processing');
-
+                console.log(result, "Result done");
                 if (result.status === 'completed' && result.content) {
+
+                  console.log("Study Guide Successfully Generated:", result.content);
+
                   toast({
                     title: "Study guide generated",
                     description: "Your study guide has been created successfully"
                   });
+
                   handleGeneratedContent('study_guide', result.content, result.metadata);
+                  console.log("caaasa setShowStudyGuideDialog")
                   setShowStudyGuideDialog(false);
                 }
               }
             } catch (error) {
               console.error('Study guide generation error:', error);
+
               toast({
                 title: "Generation failed",
                 description: error instanceof Error ? error.message : "Failed to generate study guide",
                 variant: "destructive"
               });
             } finally {
+              console.log("Study Guide Generation Process Completed.");
               setIsGenerating(false);
             }
           }}
           isGenerating={isGenerating}
           progress={generationProgress}
         />
+
 
         <UploadModal
           isOpen={showUpload}

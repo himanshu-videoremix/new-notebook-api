@@ -108,7 +108,7 @@ export const CONTENT_TYPE_CONFIGS: Record<ContentType, ContentTypeConfig> = {
       includeExamples: true,
       includeQuestions: true,
       includeSummary: true,
-      includeCitations: true
+      includeCitations: false
     },
     availableOptions: [
       'format', 'tone', 'length', 'depth', 'audience', 'complexity',
@@ -127,7 +127,7 @@ export const CONTENT_TYPE_CONFIGS: Record<ContentType, ContentTypeConfig> = {
       depth: 'balanced',
       audience: 'expert',
       includeSummary: true,
-      includeCitations: true
+      includeCitations: false
     },
     availableOptions: [
       'format', 'tone', 'length', 'depth', 'audience',
