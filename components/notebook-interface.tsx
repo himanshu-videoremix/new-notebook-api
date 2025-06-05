@@ -176,8 +176,6 @@ export function NotebookInterface() {
     storageService.saveSources([...sources, newSource]);
     setSources(prev => [...prev, newSource]);
 
-    setSelectedSources([newSource.id]);
-
     setShowUploadModal(false);
   };
 
@@ -218,19 +216,24 @@ export function NotebookInterface() {
 
     // Update the selectedSources state based on whether the source is already selected.
     const sourceId = sources[index].id;
-    setSelectedSources((prevSelected) =>
-      prevSelected.includes(sourceId)
-        ? prevSelected.filter((id) => id !== sourceId)
-        : [...prevSelected, sourceId]
-    );
+    const newSelectedSources = selectedSources.includes(sourceId)
+      ? selectedSources.filter((id) => id !== sourceId)
+      : [...selectedSources, sourceId];
+    
+    setSelectedSources(newSelectedSources);
 
     setIsGenerating(true);
 
     try {
+      // Only use selected sources for summary generation
+      const selectedSourceContents = sources
+        .filter(s => newSelectedSources.includes(s.id))
+        .map(s => ({ content: s.content, type: s.type }));
+
       const requestData = {
         text: "Sample input text",
         outputType,
-        resources: sources.map((s) => ({ content: s.content, type: s.type })),
+        resources: selectedSourceContents,
         customization: {},
       };
 

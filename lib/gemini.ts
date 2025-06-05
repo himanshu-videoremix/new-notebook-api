@@ -610,11 +610,10 @@ export const geminiService = {
 
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const prompt = `Generate a relevant source description based on the following input. Provide concise yet informative content that fits within a categorized source list.
-  
+      const prompt = `Generate a detailed source description with 5-6 lines of content based on the following input. The description should be comprehensive yet concise, covering key aspects of the source material. Each line should focus on a different important aspect or feature.
+
       User Input: ${userInput}`;
       
-
       console.log("Prompt sent to Gemini:", prompt);
 
       const result = await model.generateContent(prompt);
