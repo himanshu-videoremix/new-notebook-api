@@ -181,11 +181,11 @@ export const geminiService = {
       console.log("Parsed Response:", parsedResponse);
 
       return parsedResponse;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error in analyzeReadability:", error);
       if (error instanceof SyntaxError) {
         console.error("JSON Parsing error:", error.message);
-      } else {
+      } else if (error instanceof Error) {
         console.error("Unexpected error:", error.message);
       }
       return {
@@ -257,11 +257,11 @@ export const geminiService = {
       console.log("Parsed JSON response:", parsedResponse);
 
       return parsedResponse;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error in extractArgumentation:", error);
       if (error instanceof SyntaxError) {
         console.error("JSON Parsing error:", error.message);
-      } else {
+      } else if (error instanceof Error) {
         console.error("Unexpected error:", error.message);
       }
       return {

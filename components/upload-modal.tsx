@@ -20,6 +20,7 @@ interface UploadModalProps {
     type: string;
     content: string;
     metadata?: any;
+    overviewMessage?: any;
   }) => void;
 }
 
@@ -171,7 +172,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
           maxKeywords: 10,
         });
         const topics = Array.isArray(keywordsResult.keywords)
-          ? keywordsResult.keywords.map(k => k.term)
+          ? keywordsResult.keywords.map((k: { term: string }) => k.term)
           : [];
 
         setProgress(60);
@@ -184,13 +185,18 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
         const sourceWithMetadata = {
           ...newSource,
           metadata: {
-            overview: summary,
-            suggestedQuestions,
-            topics,
-            citations: Array.isArray(citations) ? citations : [],
-            readingTime: Math.ceil(content.split(' ').length / 200), // Rough estimate: 200 words per minute
-          },
+            summary: summary,
+            rawContent: content
+          }
         };
+
+        // Store additional metadata separately
+        storageService.saveSourceMetadata(sourceWithMetadata.id, {
+          suggestedQuestions,
+          topics,
+          citations: Array.isArray(citations) ? citations : [],
+          readingTime: Math.ceil(content.split(' ').length / 200)
+        });
 
         // Add overview message to chat
         const overviewMessage = {
@@ -238,11 +244,17 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
           {
             ...newSource,
             metadata: {
-              error: true,
-              errorMessage: error instanceof Error ? error.message : 'Analysis failed',
-            },
+              summary: '',
+              rawContent: content
+            }
           },
         ]);
+
+        // Store error information separately
+        storageService.saveSourceMetadata(newSource.id, {
+          error: true,
+          errorMessage: error instanceof Error ? error.message : 'Analysis failed'
+        });
 
         // Add error message to chat
         const errorMessage = {
