@@ -52,7 +52,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
         });
         return false;
       }
-      
+
       // Validate file type
       const validTypes = ['application/pdf', 'text/plain'];
       if (!validTypes.includes(file.type)) {
@@ -63,7 +63,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
         });
         return false;
       }
-      
+
       return true;
     });
 
@@ -80,6 +80,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
     maxSize: 10 * 1024 * 1024 // 10MB
   });
 
+  // In upload-modal.tsx, update the handleUpload function
   const handleUpload = async () => {
     setUploading(true);
     setProgress(0);
@@ -108,7 +109,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
             toast({
               title: "Invalid URL",
               description: "URL must start with http:// or https://",
-              variant: "destructive"
+              variant: "destructive",
             });
             return;
           }
@@ -126,7 +127,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
             toast({
               title: "Text too long",
               description: "Maximum 50,000 characters allowed",
-              variant: "destructive"
+              variant: "destructive",
             });
             return;
           }
@@ -146,14 +147,36 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
         content,
         type,
         selected: false,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Generate overview using Gemini
       setProgress(30);
       try {
-        const overview = await geminiService.analyzeContent(content.slice(0, 30000)); // Limit content length
+        // Use generateSummary for summary
+        const summaryResult = await geminiService.generateSummary(content.slice(0, 30000));
+        const summary = summaryResult.text || JSON.stringify(summaryResult);
+
+        // Generate suggested questions
+        const questionsResult = await geminiService.generateQuestions(content.slice(0, 30000), {
+          count: 5,
+          type: 'open-ended',
+        });
+        const suggestedQuestions = Array.isArray(questionsResult)
+          ? questionsResult.map(q => q.question)
+          : [];
+
+        // Extract topics using extractKeywords
+        const keywordsResult = await geminiService.extractKeywords(content.slice(0, 30000), {
+          maxKeywords: 10,
+        });
+        const topics = Array.isArray(keywordsResult.keywords)
+          ? keywordsResult.keywords.map(k => k.term)
+          : [];
+
         setProgress(60);
+
+        // Generate citations
         const citations = await geminiService.generateCitations(content);
         setProgress(90);
 
@@ -161,27 +184,27 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
         const sourceWithMetadata = {
           ...newSource,
           metadata: {
-            overview: overview.summary,
-            suggestedQuestions: overview.suggestedQuestions || [],
-            topics: overview.topics,
-            citations: citations || [],
-            readingTime: Math.ceil(content.split(' ').length / 200) // Rough estimate: 200 words per minute
-          }
+            overview: summary,
+            suggestedQuestions,
+            topics,
+            citations: Array.isArray(citations) ? citations : [],
+            readingTime: Math.ceil(content.split(' ').length / 200), // Rough estimate: 200 words per minute
+          },
         };
 
         // Add overview message to chat
         const overviewMessage = {
-          text: overview.summary,
+          text: summary,
           sender: 'assistant' as const,
           isOverview: true,
           error: false,
           source: {
             title: sourceWithMetadata.title,
             type: sourceWithMetadata.type,
-            suggestedQuestions: overview.suggestedQuestions,
-            citations: citations || [],
-            error: false
-          }
+            suggestedQuestions,
+            citations: Array.isArray(citations) ? citations : [],
+            error: false,
+          },
         };
 
         // Save source with metadata
@@ -195,28 +218,31 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
         if (onUploadComplete) {
           onUploadComplete({
             ...sourceWithMetadata,
-            overviewMessage
+            overviewMessage,
           });
         }
 
         toast({
           title: "Upload complete",
-          description: "Your content has been uploaded and analyzed successfully"
+          description: "Your content has been uploaded and analyzed successfully",
         });
 
         onClose();
       } catch (error) {
         console.error('Failed to generate overview:', error);
-        
+
         // Save source even if analysis fails
         const sources = storageService.loadSources();
-        storageService.saveSources([...sources, {
-          ...newSource,
-          metadata: {
-            error: true,
-            errorMessage: error instanceof Error ? error.message : 'Analysis failed'
-          }
-        }]);
+        storageService.saveSources([
+          ...sources,
+          {
+            ...newSource,
+            metadata: {
+              error: true,
+              errorMessage: error instanceof Error ? error.message : 'Analysis failed',
+            },
+          },
+        ]);
 
         // Add error message to chat
         const errorMessage = {
@@ -227,27 +253,27 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
           source: {
             title: newSource.title,
             type: newSource.type,
-            error: true
-          }
+            error: true,
+          },
         };
 
         toast({
           title: "Analysis failed",
-          description: error instanceof Error 
-            ? error.message 
+          description: error instanceof Error
+            ? error.message
             : "Content was uploaded but analysis failed. You can try analyzing it again later.",
           variant: "destructive",
-          duration: 5000
+          duration: 5000,
         });
-        
+
         // Still notify parent of upload
         if (onUploadComplete) {
           onUploadComplete({
             ...newSource,
-            overviewMessage: errorMessage
+            overviewMessage: errorMessage,
           });
         }
-        
+
         onClose();
       }
     } catch (error) {
@@ -255,7 +281,7 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
       toast({
         title: "Upload failed",
         description: "An error occurred while uploading your content",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setUploading(false);
@@ -281,129 +307,129 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
             Examples: marketing plans, course reading, research notes, meeting transcripts, sales documents, etc.
           </p>
         </DialogHeader>
-      <div>
-        <div className="p-6">
-          {/* Tabs */}
-          <div className="flex gap-4 mb-6">
-            <Button
-              variant="ghost"
-              className={`flex-1 ${activeTab === 'file' ? 'bg-[#2B2D31] text-white' : 'text-gray-400'}`}
-              onClick={() => setActiveTab('file')}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              File Upload
-            </Button>
-            <Button
-              variant="ghost"
-              className={`flex-1 ${activeTab === 'link' ? 'bg-[#2B2D31] text-white' : 'text-gray-400'}`}
-              onClick={() => setActiveTab('link')}
-            >
-              <Link2 className="h-4 w-4 mr-2" />
-              Add Link
-            </Button>
-            <Button
-              variant="ghost"
-              className={`flex-1 ${activeTab === 'text' ? 'bg-[#2B2D31] text-white' : 'text-gray-400'}`}
-              onClick={() => setActiveTab('text')}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Paste Text
-            </Button>
-          </div>
+        <div>
+          <div className="p-6">
+            {/* Tabs */}
+            <div className="flex gap-4 mb-6">
+              <Button
+                variant="ghost"
+                className={`flex-1 ${activeTab === 'file' ? 'bg-[#2B2D31] text-white' : 'text-gray-400'}`}
+                onClick={() => setActiveTab('file')}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                File Upload
+              </Button>
+              <Button
+                variant="ghost"
+                className={`flex-1 ${activeTab === 'link' ? 'bg-[#2B2D31] text-white' : 'text-gray-400'}`}
+                onClick={() => setActiveTab('link')}
+              >
+                <Link2 className="h-4 w-4 mr-2" />
+                Add Link
+              </Button>
+              <Button
+                variant="ghost"
+                className={`flex-1 ${activeTab === 'text' ? 'bg-[#2B2D31] text-white' : 'text-gray-400'}`}
+                onClick={() => setActiveTab('text')}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Paste Text
+              </Button>
+            </div>
 
-          {/* Content Area */}
-          <div className="min-h-[300px]">
-            {activeTab === 'file' && (
-              <div 
-                {...getRootProps()}
-                className={`
+            {/* Content Area */}
+            <div className="min-h-[300px]">
+              {activeTab === 'file' && (
+                <div
+                  {...getRootProps()}
+                  className={`
                   border-2 border-dashed rounded-lg p-12 text-center transition-colors duration-200
                   ${isDragActive ? 'border-blue-500 bg-[#2B2D31]' : 'border-[#2B2D31] hover:border-blue-500'}
                 `}
-              >
-                <input {...getInputProps()} />
-                <div className="flex justify-center mb-4">
-                  <div className="p-3 bg-blue-500/10 rounded-full">
-                    <Upload className="h-6 w-6 text-blue-500" />
+                >
+                  <input {...getInputProps()} />
+                  <div className="flex justify-center mb-4">
+                    <div className="p-3 bg-blue-500/10 rounded-full">
+                      <Upload className="h-6 w-6 text-blue-500" />
+                    </div>
                   </div>
+                  <h3 className="text-lg font-semibold mb-2 text-white">Upload sources</h3>
+                  <p className="text-gray-400 mb-2 select-none">
+                    {isDragActive ? (
+                      "Drop files here..."
+                    ) : (
+                      <>
+                        Drag & drop or <span className="text-blue-500 hover:underline cursor-pointer">choose file</span> to upload
+                      </>
+                    )}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Supported file types: PDF, TXT (Max 10MB)
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-white">Upload sources</h3>
-                <p className="text-gray-400 mb-2 select-none">
-                  {isDragActive ? (
-                    "Drop files here..."
-                  ) : (
-                    <>
-                      Drag & drop or <span className="text-blue-500 hover:underline cursor-pointer">choose file</span> to upload
-                    </>
-                  )}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Supported file types: PDF, TXT (Max 10MB)
-                </p>
-              </div>
-            )}
+              )}
 
-            {activeTab === 'link' && (
-              <div className="space-y-4">
-                <Input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="Enter URL (e.g., https://example.com or YouTube link)"
-                  className="bg-[#2B2D31] border-[#3B3D41] text-white"
-                />
-                <p className="text-sm text-gray-500">
-                  Enter a valid URL starting with http:// or https://
-                </p>
-              </div>
-            )}
-
-            {activeTab === 'text' && (
-              <div className="space-y-4">
-                <Textarea
-                  ref={textAreaRef}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Paste or type your text content here..."
-                  className="min-h-[200px] bg-[#2B2D31] border-[#3B3D41] text-white"
-                />
-                <p className="text-sm text-gray-500">
-                  {text.length}/50,000 characters
-                </p>
-              </div>
-            )}
-
-            {/* Upload Progress */}
-            {uploading && (
-              <div className="mt-4 space-y-2">
-                <Progress value={progress} className="h-2" />
-                <p className="text-sm text-center text-gray-400">
-                  Uploading... {progress}%
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="mt-6 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              <div className="flex items-center gap-2">
-                <span>Source limit</span>
-                <div className="w-32 bg-[#2B2D31] rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '4%' }}></div>
+              {activeTab === 'link' && (
+                <div className="space-y-4">
+                  <Input
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="Enter URL (e.g., https://example.com or YouTube link)"
+                    className="bg-[#2B2D31] border-[#3B3D41] text-white"
+                  />
+                  <p className="text-sm text-gray-500">
+                    Enter a valid URL starting with http:// or https://
+                  </p>
                 </div>
-                <span>2/50</span>
-              </div>
+              )}
+
+              {activeTab === 'text' && (
+                <div className="space-y-4">
+                  <Textarea
+                    ref={textAreaRef}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Paste or type your text content here..."
+                    className="min-h-[200px] bg-[#2B2D31] border-[#3B3D41] text-white"
+                  />
+                  <p className="text-sm text-gray-500">
+                    {text.length}/50,000 characters
+                  </p>
+                </div>
+              )}
+
+              {/* Upload Progress */}
+              {uploading && (
+                <div className="mt-4 space-y-2">
+                  <Progress value={progress} className="h-2" />
+                  <p className="text-sm text-center text-gray-400">
+                    Uploading... {progress}%
+                  </p>
+                </div>
+              )}
             </div>
-            <Button
-              onClick={handleUpload}
-              disabled={uploading}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {uploading ? 'Uploading...' : 'Upload'}
-            </Button>
+
+            {/* Footer */}
+            <div className="mt-6 flex justify-between items-center">
+              <div className="text-sm text-gray-500">
+                <div className="flex items-center gap-2">
+                  <span>Source limit</span>
+                  <div className="w-32 bg-[#2B2D31] rounded-full h-2">
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '4%' }}></div>
+                  </div>
+                  <span>2/50</span>
+                </div>
+              </div>
+              <Button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {uploading ? 'Uploading...' : 'Upload'}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
       </DialogContent>
     </Dialog>
   );
