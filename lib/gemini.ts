@@ -43,7 +43,7 @@ export const geminiService = {
   async extractKeywords(text: string, options: { maxKeywords: number }) {
     try {
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const prompt = `Extract the ${options.maxKeywords} most important keywords from the text. For each keyword, provide its relevance score (0-1) and category. Return as a JSON object with a 'keywords' array containing objects with: 'term', 'relevance', and 'category'.
         Also include:
@@ -85,7 +85,7 @@ export const geminiService = {
       console.log("Extracting entities for text:", text);
 
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const prompt = `Extract and classify named entities from the text. For each entity, provide:
       - type (PERSON, ORG, LOC, DATE, TIME, MONEY, PERCENT, PRODUCT, EVENT, WORK_OF_ART, LAW, LANGUAGE)
@@ -134,8 +134,8 @@ export const geminiService = {
   },
 
   async analyzeReadability(text: string) {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Perform a comprehensive readability analysis including:
     1. Standard Metrics:
@@ -197,8 +197,8 @@ export const geminiService = {
   },
 
   async extractArgumentation(text: string) {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Analyze the argumentative structure including:
     1. Main Arguments:
@@ -310,8 +310,8 @@ export const geminiService = {
     text: string,
     options: { count: number; complexity: string }
   ) {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Create ${options.count} flashcards at ${options.complexity} complexity level from the text. Return as a JSON array of objects with 'front' and 'back' properties.
 
@@ -322,25 +322,71 @@ export const geminiService = {
     return JSON.parse(response.text());
   },
 
-  async generateQuestions(
+ async generateQuestions(
     text: string,
     options: { count: number; type: string }
   ) {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    try {
+      console.log("Calling generateQuestions with text length:", text.length);
+      const apiKey = process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc';
+      if (!apiKey) {
+        throw new Error("GOOGLE_API_KEY is not set");
+      }
+      console.log("API Key:", apiKey);
 
-    const prompt = `Generate ${options.count} ${options.type} questions from the text. Return as a JSON array of objects with 'question', 'options' (for multiple choice), and 'answer' properties.
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Using flash for higher quota
+      const prompt = `Generate ${options.count} ${options.type} questions from the text. Return as a JSON array of objects with 'question', 'options' (for multiple choice), and 'answer' properties.
 
-    Text to use: ${text}`;
+      Text to use: ${text.slice(0, 30000)}`; // Limit text to avoid token issues
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return JSON.parse(response.text());
+      console.log("Prompt sent to Gemini:", prompt);
+
+      const result = await model.generateContent(prompt);
+      if (!result || !result.response) {
+        throw new Error("Invalid response from Gemini model");
+      }
+
+      const response = await result.response;
+      let responseText = await response.text();
+      console.log("Raw response from Gemini:", responseText);
+
+      // Clean Markdown formatting
+      responseText = responseText
+        .trim()
+        .replace(/^```json\n/, '') // Remove starting ```json
+        .replace(/^```/, '') // Remove starting ```
+        .replace(/\n```$/, '') // Remove ending ```
+        .trim();
+
+      console.log("Cleaned response:", responseText);
+
+      // Validate JSON
+      if (!responseText.startsWith('[') && !responseText.startsWith('{')) {
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+      }
+
+      const parsedResponse = JSON.parse(responseText);
+      console.log("Parsed JSON response:", parsedResponse);
+
+      // Validate expected structure
+      if (!Array.isArray(parsedResponse)) {
+        throw new Error("Expected an array of questions, received: " + JSON.stringify(parsedResponse));
+      }
+
+      return parsedResponse;
+    } catch (error) {
+      console.error("Error in generateQuestions:", error);
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : "Failed to generate questions",
+      };
+    }
   },
 
   async compareDocuments(texts: string[]) {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Compare the provided texts and analyze their similarities and differences. Return a JSON object with: commonThemes, uniquePoints, and recommendations.
 
@@ -352,8 +398,8 @@ export const geminiService = {
   },
 
   async generateTimeline(text: string) {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Create a chronological timeline of events from the text. Return as a JSON array of objects with 'date', 'event', and 'description' properties.
 
@@ -372,8 +418,8 @@ export const geminiService = {
       format: string;
     }
   ) {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `Create a deep dive discussion between two experts (${options.host1} and ${options.host2}) about the following content.
 
@@ -413,8 +459,8 @@ export const geminiService = {
     try {
       console.log("Generating citations with style:", style);
 
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = `Extract and format citations from the text in ${style} style. Return as a JSON array of citation strings.\n\nText to analyze: ${text}`;
 
       console.log("Prompt sent to Gemini:", prompt);
@@ -440,8 +486,8 @@ export const geminiService = {
     try {
       console.log("Calling Semantic Analysis");
 
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = `Analyze the semantic structure of the given text. Identify key meanings, relationships between words, and contextual interpretations. Summarize how different terms and phrases interact to form meaning.\n\nText to analyze: ${text}`;
 
       console.log("Prompt sent to Gemini:", prompt);
@@ -480,8 +526,8 @@ export const geminiService = {
     try {
       console.log("Calling Concepts Extraction");
 
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = `Extract and summarize the core concepts from the given text. Identify the fundamental ideas and provide a brief explanation of their relevance.\n\nText to analyze: ${text}`;
 
       console.log("Prompt sent to Gemini:", prompt);
@@ -520,8 +566,8 @@ export const geminiService = {
     try {
       console.log("Calling Text Comparison");
 
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || 'AIzaSyBZ5NQ3dF5sdMBSjfkD6Oejw9VRhPTSUdc');
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = `Compare two pieces of text and highlight the differences, similarities, and contextual changes. Identify changes in meaning, tone, and factual accuracy. Text to analyze: ${text}`;
 
       console.log("Prompt sent to Gemini:", prompt);
@@ -567,6 +613,7 @@ export const geminiService = {
       const prompt = `Generate a relevant source description based on the following input. Provide concise yet informative content that fits within a categorized source list.
   
       User Input: ${userInput}`;
+      
 
       console.log("Prompt sent to Gemini:", prompt);
 
